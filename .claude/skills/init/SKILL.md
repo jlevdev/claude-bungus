@@ -1,13 +1,13 @@
 ---
 name: init
-description: This skill should be used when the user wants to scaffold a fresh project's file structure from the claude-greenfield template — e.g. "set up this project", "scaffold the ticket workflow here", "init this repo from the template" — or says "/init" or "/cg:init". Distinct from Claude Code's built-in codebase-documentation /init: this one lays down the ticket/question/PRD workflow files, not a CLAUDE.md audit of existing code.
+description: This skill should be used when the user wants to scaffold a fresh project's file structure from the claude-bungus template — e.g. "set up this project", "scaffold the ticket workflow here", "init this repo from the template" — or says "/init" or "/bg:init". Distinct from Claude Code's built-in codebase-documentation /init: this one lays down the ticket/question/PRD workflow files, not a CLAUDE.md audit of existing code.
 allowed-tools: [Read, Write, Bash, Glob, AskUserQuestion]
 version: 1.0.0
 ---
 
 # Init
 
-Scaffold the ticket-based PRD workflow into the current project: `project blurb.md`, `templates/`, `tickets/`, `questions/`, `DECISIONS.md`, `CHANGELOG.md`, and a starter `CLAUDE.md`. Run this once, before `/cg:start-project`, in a project that installed the `cg` plugin but doesn't yet have this scaffolding on disk.
+Scaffold the ticket-based PRD workflow into the current project: `project blurb.md`, `templates/`, `tickets/`, `questions/`, `DECISIONS.md`, `CHANGELOG.md`, and a starter `CLAUDE.md`. Run this once, before `/bg:start-project`, in a project that installed the `bg` plugin but doesn't yet have this scaffolding on disk.
 
 This is a fresh-project setup step, not a codebase audit — don't confuse it with Claude Code's built-in `/init` (which writes a `CLAUDE.md` by reading existing code). If both are ambiguous from context, ask which the user means.
 
@@ -23,13 +23,13 @@ This is a fresh-project setup step, not a codebase audit — don't confuse it wi
      `tickets/{features,remediation}/{todo,in-progress,on-hold,review,done}/.gitkeep`
      `questions/{open,answered}/.gitkeep`
    - Create a blank `project blurb.md` at the project root if one doesn't already exist.
-   - Copy `$ASSET_ROOT/templates/DECISIONS.md` → `./DECISIONS.md` and `$ASSET_ROOT/templates/CHANGELOG.md` → `./CHANGELOG.md` (both unmodified — they're tool-maintained from here on, same as `/cg:start-project` step 3d-iii would otherwise do).
-   - Copy `$ASSET_ROOT/templates/CLAUDE.md` → `./CLAUDE.md`. This is the distributed starter — it already documents the ticket workflow, reviewer subagents, and research standards with the `cg:` invocation prefix; only its top placeholder sections (`[Project Name]`, Tech Stack, etc.) still need filling in, which is `/cg:start-project`'s job, not this skill's.
+   - Copy `$ASSET_ROOT/templates/DECISIONS.md` → `./DECISIONS.md` and `$ASSET_ROOT/templates/CHANGELOG.md` → `./CHANGELOG.md` (both unmodified — they're tool-maintained from here on, same as `/bg:start-project` step 3d-iii would otherwise do).
+   - Copy `$ASSET_ROOT/templates/CLAUDE.md` → `./CLAUDE.md`. This is the distributed starter — it already documents the ticket workflow, reviewer subagents, and research standards with the `bg:` invocation prefix; only its top placeholder sections (`[Project Name]`, Tech Stack, etc.) still need filling in, which is `/bg:start-project`'s job, not this skill's.
    - Ensure `.gitignore` contains `research/*` and `.claude/pr-watch-state/` — append whichever lines are missing, create the file if it doesn't exist.
 
-4. **Report what was created and what was skipped**, then point the user at the next step: fill in `project blurb.md` with their idea, then run `/cg:start-project`.
+4. **Report what was created and what was skipped**, then point the user at the next step: fill in `project blurb.md` with their idea, then run `/bg:start-project`.
 
 ## Notes
 
-- This skill only lays down structure — it never runs `git init` or commits anything. `/cg:start-project` still owns that (its step 3e), so a user can review the scaffold before it's committed.
-- If the project has no `.claude-plugin` install context at all (i.e. someone copied these files by hand instead of installing the `cg` plugin), that's fine — the scaffold still works, just without the "pull future updates via `claude plugin update`" benefit. Mention this once if it's the case, don't belabor it.
+- This skill only lays down structure — it never runs `git init` or commits anything. `/bg:start-project` still owns that (its step 3e), so a user can review the scaffold before it's committed.
+- If the project has no `.claude-plugin` install context at all (i.e. someone copied these files by hand instead of installing the `bg` plugin), that's fine — the scaffold still works, just without the "pull future updates via `claude plugin update`" benefit. Mention this once if it's the case, don't belabor it.
