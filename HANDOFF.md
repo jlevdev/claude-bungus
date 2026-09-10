@@ -1,6 +1,6 @@
 # Handoff: hook `if` false-positive on brace expansion
 
-Found while testing the `cg` plugin conversion (see `.claude-plugin/`), unrelated to that work. Originally written up here to be handled as a separate follow-up after pushing the plugin changes — but CodeRabbit's review of the resulting PR (#10) independently surfaced the same bug against `.claude/hooks/hooks.json`, and the repo-local instances were fixed in that same PR rather than deferred. This file is kept as the record of the underlying issue, which is still real: the fix below works around it locally, it doesn't change the platform's `if` matcher itself.
+Found while testing the `bg` plugin conversion (see `.claude-plugin/`), unrelated to that work. Originally written up here to be handled as a separate follow-up after pushing the plugin changes — but CodeRabbit's review of the resulting PR (#10) independently surfaced the same bug against `.claude/hooks/hooks.json`, and the repo-local instances were fixed in that same PR rather than deferred. This file is kept as the record of the underlying issue, which is still real: the fix below works around it locally, it doesn't change the platform's `if` matcher itself.
 
 ## The bug
 

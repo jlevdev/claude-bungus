@@ -2,7 +2,7 @@
 
 > This file is the primary context document for Claude Code agents. Keep it current — agents read it at the start of every session to understand the project.
 
-> The ticket workflow, skills, commands, and reviewer subagents this file describes are distributed via the `cg` Claude Code plugin (source: `jlevdev/claude-greenfield`) — that's why they're invoked as `/cg:name` below. To pull in improvements made to the template after this project started: `claude plugin update cg@claude-greenfield`.
+> The ticket workflow, skills, commands, and reviewer subagents this file describes are distributed via the `bg` Claude Code plugin (source: `jlevdev/claude-bungus`) — that's why they're invoked as `/bg:name` below. To pull in improvements made to the template after this project started: `claude plugin update bg@claude-bungus`.
 
 ## Overview
 
@@ -69,7 +69,7 @@ questions/
 
 Question files are named `q-N-<slug>.md` and use `templates/question.md`. Each question lists which ticket IDs it blocks. When you answer a question, fill in the Answer section and move the file to `questions/answered/`.
 
-Claude will create question files automatically when hitting genuine implementation blockers, and will surface open questions in `/cg:whats-next`, `/cg:describe`, and `/cg:implement`.
+Claude will create question files automatically when hitting genuine implementation blockers, and will surface open questions in `/bg:whats-next`, `/bg:describe`, and `/bg:implement`.
 
 ### Ticket System
 
@@ -100,42 +100,42 @@ Templates are in `templates/`.
 
 ### Living Documents
 
-`DECISIONS.md` and `CHANGELOG.md` (repo root, created by `/cg:init`) are tool-maintained — hand-editing them still works, but it isn't the default way they get updated:
+`DECISIONS.md` and `CHANGELOG.md` (repo root, created by `/bg:init`) are tool-maintained — hand-editing them still works, but it isn't the default way they get updated:
 
-- **`DECISIONS.md`** gets a new ADR entry from `/cg:research` (Step 7, when a research conclusion sets or changes a real architectural/product decision) and from `/cg:implement` (end of a ticket, only if that ticket's work involved a decision not obvious from the code). Both draft the entry and confirm with the user via `AskUserQuestion` before appending — this file stays curated, not a firehose.
-- **`CHANGELOG.md`** gets an entry from `/cg:git-clean`, which closes out any tickets a newly-merged branch shipped (moving them `review/` → `done/`) and appends a summary line automatically, no confirmation needed — it's a mechanical record of a merge that already happened.
+- **`DECISIONS.md`** gets a new ADR entry from `/bg:research` (Step 7, when a research conclusion sets or changes a real architectural/product decision) and from `/bg:implement` (end of a ticket, only if that ticket's work involved a decision not obvious from the code). Both draft the entry and confirm with the user via `AskUserQuestion` before appending — this file stays curated, not a firehose.
+- **`CHANGELOG.md`** gets an entry from `/bg:git-clean`, which closes out any tickets a newly-merged branch shipped (moving them `review/` → `done/`) and appends a summary line automatically, no confirmation needed — it's a mechanical record of a merge that already happened.
 
 ### Sprint Flow
 
 1. Tickets are written in `todo`
-2. `/cg:implement feat-N` moves them to `in-progress` and builds with TDD — offers (doesn't default to) isolating the work in a git worktree first, so a bad TDD cycle stays on a disposable branch
+2. `/bg:implement feat-N` moves them to `in-progress` and builds with TDD — offers (doesn't default to) isolating the work in a git worktree first, so a bad TDD cycle stays on a disposable branch
 3. Before moving to `review`, the `ticket-reviewer`, `silent-failure-hunter`, and `test-coverage-reviewer` subagents check the diff against the ticket's acceptance criteria, error handling, and test coverage — blocking findings get fixed first, notes carry into the ticket summary
-4. Developer reviews; `/cg:review-tests` runs chaos monkey validation
-5. Once the PR is accepted and merged, `/cg:git-clean` moves the ticket to `done` and logs it in `CHANGELOG.md`
+4. Developer reviews; `/bg:review-tests` runs chaos monkey validation
+5. Once the PR is accepted and merged, `/bg:git-clean` moves the ticket to `done` and logs it in `CHANGELOG.md`
 
 ### Available Commands & Skills
 
-Both are invoked the same way (`/cg:name`). Skills additionally auto-trigger from plain-language requests (e.g. "what should I work on next" fires `whats-next` without typing the slash command), support progressive disclosure via a `references/` directory so detail loads only when needed, and can scope down tool access per mode via `allowed-tools`. Commands stay commands where that auto-trigger behavior isn't wanted (deliberate, one-shot, or purely mechanical actions).
+Both are invoked the same way (`/bg:name`). Skills additionally auto-trigger from plain-language requests (e.g. "what should I work on next" fires `whats-next` without typing the slash command), support progressive disclosure via a `references/` directory so detail loads only when needed, and can scope down tool access per mode via `allowed-tools`. Commands stay commands where that auto-trigger behavior isn't wanted (deliberate, one-shot, or purely mechanical actions).
 
 Cost tiering: a skill that's read-only, single-shot, and never calls `AskUserQuestion`/`Agent` (so its whole execution lands inside one turn) can set `effort: low` in its frontmatter — `describe` and `whats-next` do this. A skill that spans multiple turns (asks questions, waits on subagents) won't hold a turn-scoped override for its full run, so this only fits the single-shot case; don't add it to `implement`/`pr-watch`/`research`/`review-tests`/`pr-review`, which all genuinely need full reasoning depth for at least part of their work anyway.
 
 | Name | Type | What it does |
 |------|------|-------------|
-| `/cg:init` | skill | Scaffold a fresh project's file structure (blurb, templates, tickets, questions, DECISIONS/CHANGELOG, starter CLAUDE.md) — run this once before start-project |
-| `/cg:start-project` | command | Turn a project blurb into a PRD, initial tickets, and an initialized git repo |
-| `/cg:research` | skill | Evaluate technology options with prompt-injection awareness and package vetting |
-| `/cg:implement feat-N` | skill | Enter TDD implementation mode for one or more tickets |
-| `/cg:describe feat-N` | skill | Summarize one or more tickets in plain language |
-| `/cg:whats-next` | skill | Overview of all in-progress and todo work |
-| `/cg:review-tests` | skill | Chaos monkey validation of tests for items in review |
-| `/cg:pr-review [PR\|branch]` | skill | Read-only, severity-tagged review of a finished PR via parallel subagents — see below |
-| `/cg:pr-watch [PR\|branch] [reset]` | skill | Walks every unresolved comment and merge-blocking condition one at a time via `AskUserQuestion`, with a recommendation for each, until the PR has nothing outstanding — see below |
-| `/cg:git-commit` | command | Stage and commit with conventional commit message |
-| `/cg:git-branch` | command | Create a branch following naming conventions |
-| `/cg:git-pr` | command | Open a pull request or merge request |
-| `/cg:git-clean` | command | Delete local branches/worktrees whose remote is gone; close out any tickets that branch shipped (`review/` → `done/`, logged to `CHANGELOG.md`) |
-| `/cg:git-ship` | command | Branch (if needed), commit, push, and open a PR in one step |
-| `/cg:deploy` | command | Pre-deploy checklist and deployment execution |
+| `/bg:init` | skill | Scaffold a fresh project's file structure (blurb, templates, tickets, questions, DECISIONS/CHANGELOG, starter CLAUDE.md) — run this once before start-project |
+| `/bg:start-project` | command | Turn a project blurb into a PRD, initial tickets, and an initialized git repo |
+| `/bg:research` | skill | Evaluate technology options with prompt-injection awareness and package vetting |
+| `/bg:implement feat-N` | skill | Enter TDD implementation mode for one or more tickets |
+| `/bg:describe feat-N` | skill | Summarize one or more tickets in plain language |
+| `/bg:whats-next` | skill | Overview of all in-progress and todo work |
+| `/bg:review-tests` | skill | Chaos monkey validation of tests for items in review |
+| `/bg:pr-review [PR\|branch]` | skill | Read-only, severity-tagged review of a finished PR via parallel subagents — see below |
+| `/bg:pr-watch [PR\|branch] [reset]` | skill | Walks every unresolved comment and merge-blocking condition one at a time via `AskUserQuestion`, with a recommendation for each, until the PR has nothing outstanding — see below |
+| `/bg:git-commit` | command | Stage and commit with conventional commit message |
+| `/bg:git-branch` | command | Create a branch following naming conventions |
+| `/bg:git-pr` | command | Open a pull request or merge request |
+| `/bg:git-clean` | command | Delete local branches/worktrees whose remote is gone; close out any tickets that branch shipped (`review/` → `done/`, logged to `CHANGELOG.md`) |
+| `/bg:git-ship` | command | Branch (if needed), commit, push, and open a PR in one step |
+| `/bg:deploy` | command | Pre-deploy checklist and deployment execution |
 
 ### Reviewer Subagents
 
@@ -154,17 +154,17 @@ Invoked automatically (by `implement`'s reviewer gate and/or `pr-review` — see
 
 ### Keeping This Toolkit Updated
 
-This project's ticket workflow, skills, commands, and reviewer subagents came from the `cg` Claude Code plugin (`jlevdev/claude-greenfield`), installed via a marketplace add. When the template gets improved upstream, pull those changes into this project explicitly — updates are version-pinned, not automatic:
+This project's ticket workflow, skills, commands, and reviewer subagents came from the `bg` Claude Code plugin (`jlevdev/claude-bungus`), installed via a marketplace add. When the template gets improved upstream, pull those changes into this project explicitly — updates are version-pinned, not automatic:
 
 ```shell
-claude plugin update cg@claude-greenfield
+claude plugin update bg@claude-bungus
 ```
 
 If this project has customized a skill or command locally, that customization lives in this repo's own `.claude/` and takes precedence over the plugin's copy of the same name — it won't be silently overwritten by an update.
 
 ### MCP Servers
 
-[If GitHub or Context7 MCP were wired up during `/cg:start-project`, document required environment variables here.]
+[If GitHub or Context7 MCP were wired up during `/bg:start-project`, document required environment variables here.]
 
 ---
 

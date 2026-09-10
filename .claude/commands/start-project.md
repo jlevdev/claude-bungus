@@ -5,7 +5,7 @@ Guide the user from their project blurb to a fully documented PRD, initial ticke
 
 ## Step 0 — Confirm the scaffold exists
 
-If `templates/`, `tickets/`, and `questions/` aren't present yet, this project hasn't been scaffolded. Run the `init` skill first (`/cg:init` in a downstream project, `/init` in this template repo) — it lays down those directories, `DECISIONS.md`, `CHANGELOG.md`, and a starter `CLAUDE.md` before this command tries to fill any of them in.
+If `templates/`, `tickets/`, and `questions/` aren't present yet, this project hasn't been scaffolded. Run the `init` skill first (`/bg:init` in a downstream project) — it lays down those directories, `DECISIONS.md`, `CHANGELOG.md`, and a starter `CLAUDE.md` before this command tries to fill any of them in. (This template repo itself already carries this scaffolding for its own dogfooding use, so this step should never trigger here — `/init` isn't meant to be run in this repo; see its entry in the Available Commands & Skills table below.)
 
 ## Step 1 — Read the blurb
 Look for `project blurb.md` in the project root. Read it fully. If it doesn't exist, ask the user to either create one or paste their idea directly.
