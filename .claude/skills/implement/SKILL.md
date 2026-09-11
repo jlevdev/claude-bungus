@@ -3,20 +3,20 @@ name: implement
 description: This skill should be used when the user asks to implement, build, or work on one or more tickets — e.g. "implement #12", "build #7", "let's start on #4 and #5" — or says "/implement". Enters test-driven implementation mode against this project's GitHub Issues + Projects ticket workflow.
 argument-hint: <#N> [more issue numbers...]
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, EnterWorktree, ExitWorktree, mcp__github__issue_read, mcp__github__issue_write, mcp__github__list_issues, mcp__github__search_issues, mcp__github__add_issue_comment, mcp__github__projects_get, mcp__github__projects_list]
-version: 2.1.0
+version: 2.2.0
 ---
 
 # Implement Mode
 
 Build one or more tickets using test-driven development. Tickets are GitHub Issues on this repo's GitHub Project — see `CLAUDE.md`'s "Ticket System" section for the field schema (Ticket Status, `type:*`/`priority:*`/`effort:*` labels, native Milestone).
 
-**Ticket Status changes go through `gh project item-edit` (Bash), not the MCP `projects_write` tool.** It's a deterministic single-field flip, the same category of operation `wrap-up` already does via `gh`, and — unlike an MCP call — a Bash command is what `require-tests-before-review.sh` can actually see and gate on before a ticket reaches `Review`. Resolve the field id and each status option's id from `.claude/github-project-config.json` (written by `/bg:init`) rather than hardcoding or re-deriving them:
+**Ticket Status changes go through `gh project item-edit` (Bash), not the MCP `projects_write` tool.** It's a deterministic single-field flip, the same category of operation `wrap-up` already does via `gh`, and — unlike an MCP call — a Bash command is what `require-tests-before-review.sh` can actually see and gate on before a ticket reaches `Review`.
+
+**The field/option ids must appear as literal values in the command itself — never as a shell variable or a `$(...)` substitution.** `require-tests-before-review.sh` is a `PreToolUse` hook: it inspects the command's *text* before bash evaluates anything, so `--field-id "$FIELD_ID"` or `--field-id "$(jq ...)"` never actually contains the resolved id string the hook is matching on — the gate would silently pass through every Review transition instead of enforcing anything. Resolve the ids first, as their own step (`Read` the file, or a `cat .claude/github-project-config.json` Bash call whose output you read back), then write the `gh project item-edit` command with the real values typed directly in:
 ```bash
-FIELD_ID=$(jq -r '.ticketStatusField.id' .claude/github-project-config.json)
-STATUS_ID=$(jq -r '.ticketStatusField.options["<Todo|In Progress|On Hold|Review|Done>"]' .claude/github-project-config.json)
-gh project item-edit --id <item-id> --project-id "$(jq -r '.project.id' .claude/github-project-config.json)" --field-id "$FIELD_ID" --single-select-option-id "$STATUS_ID"
+gh project item-edit --id <item-id> --project-id <project id> --field-id <ticket status field id> --single-select-option-id <status option id>
 ```
-`<item-id>` is the project item id for this ticket's issue — resolve it with `gh project item-list <number> --owner <owner> --format json`, matching on the issue's URL, if it isn't already known from an earlier step this run.
+substituting the actual values from `.claude/github-project-config.json` (written by `/bg:init`) for every placeholder above — not the placeholder text, and not a reference to where it came from. `<item-id>` is the project item id for this ticket's issue — resolve it with `gh project item-list <number> --owner <owner> --format json`, matching on the issue's URL, if it isn't already known from an earlier step this run.
 
 ## Pre-flight
 

@@ -3,7 +3,7 @@ name: whats-next
 description: This skill should be used when the user asks for a status overview, what to work on next, or a sprint summary — e.g. "what's next", "what should I work on", "give me a status update", "what's blocked" — or says "/whats-next".
 allowed-tools: [mcp__github__list_issues, mcp__github__search_issues, mcp__github__projects_get, mcp__github__projects_list]
 effort: low
-version: 2.0.0
+version: 2.1.0
 ---
 
 # What's Next
@@ -12,7 +12,7 @@ Give the user a clear overview of current and upcoming work. Tickets are GitHub 
 
 ## Steps
 
-1. Query the project board (`projects_get`/`projects_list`) for open issues, grouped by Ticket Status: `In Progress`, `Todo`, `On Hold`. Read each item's `type:*`/`priority:*`/`effort:*` labels and Milestone via `list_issues`/`search_issues`.
+1. Query the project board for open issues, grouped by Ticket Status: `In Progress`, `Todo`, `On Hold`. Ticket Status is a custom per-item field, not returned by default — pass it explicitly (`field_names: ["Ticket Status"]`, or the field's id from `.claude/github-project-config.json`) to whichever `projects_list`/`list_project_items`-style call is actually exposed. Read each item's `type:*`/`priority:*`/`effort:*` labels and Milestone via `list_issues`/`search_issues`.
 
 2. Query open issues labeled `type:question` and note which ticket(s) each one's body `## Blocks` section references.
 
@@ -22,7 +22,7 @@ Give the user a clear overview of current and upcoming work. Tickets are GitHub 
 Any open `type:question` issues. For each: **[#N]** the question, and which tickets it blocks. If there are none, omit this section.
 
 ### In Progress
-Items with Ticket Status `In Progress`. Note how long they've been in-progress if the issue's `created` date suggests they've been here a while.
+Items with Ticket Status `In Progress`. Don't infer how long something's been *in that status* from the issue's `created` date — an issue can be old and only just moved to `In Progress` today, so age isn't status duration. Only report a duration if an actual status-transition timestamp is readily available; otherwise omit it rather than show a misleading number.
 
 ### Up Next — Features
 Ticket Status `Todo` issues labeled `type:feature`, sorted by priority (critical → high → medium → low). If priorities are equal, use milestone order.

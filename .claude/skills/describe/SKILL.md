@@ -4,7 +4,7 @@ description: This skill should be used when the user wants a plain-language summ
 argument-hint: <#N> [more issue numbers...]
 allowed-tools: [mcp__github__issue_read, mcp__github__search_issues, mcp__github__projects_get]
 effort: low
-version: 2.0.0
+version: 2.1.0
 ---
 
 # Describe
@@ -14,7 +14,7 @@ Give the user a plain-language summary of one or more tickets. Tickets are GitHu
 ## Steps
 
 1. Parse the issue numbers from the request (e.g., `#12`, `#7`).
-2. For each number, fetch the issue via `issue_read` and its Ticket Status via `projects_get`.
+2. For each number, fetch the issue via `issue_read` and its Ticket Status via the project board — pass the field explicitly (`field_names: ["Ticket Status"]`, or the field's id from `.claude/github-project-config.json`) to whichever `projects_get`/`list_project_items`-style call is actually exposed, since it's a custom per-item field and isn't returned by default.
 3. For each ticket found, output:
    - **[#N] Title** *(Ticket Status)*
    - What it does in 2-3 sentences — plain language, no jargon

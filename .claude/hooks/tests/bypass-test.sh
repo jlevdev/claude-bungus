@@ -330,6 +330,27 @@ review_gate_case "item-edit into Review with a detected stack and failing tests 
 review_gate_case "item-edit into a different status option (Done) is ignored even with failing tests" \
   allow "gh project item-edit --field-id $RTBR_FIELD_ID --single-select-option-id $RTBR_DONE_ID" "$RTBR_STACK" 1
 
+# Known gap: this hook is a PreToolUse hook -- it inspects the command's
+# *text* before bash evaluates anything, so a shell variable or $(...)
+# substitution never actually contains the resolved id string in what the
+# hook sees, regardless of whether tests would pass or fail. This can't be
+# fixed hook-side; it's why /bg:implement's own instructions require the
+# literal id values typed directly into the command rather than referenced
+# via a variable (see .claude/skills/implement/SKILL.md) -- documented here
+# so the boundary stays explicit rather than silently assumed.
+printf '#!/bin/bash\nexit 1\n' > "$RTBR_BIN/npm"
+chmod +x "$RTBR_BIN/npm"
+echo "$(bash_input 'gh project item-edit --field-id "$FIELD_ID" --single-select-option-id "$STATUS_ID"')" \
+  | CLAUDE_PROJECT_DIR="$RTBR_STACK" PATH="$RTBR_BIN:$PATH" "$HOOKS_DIR/$H" >/dev/null 2>&1
+code=$?
+TOTAL=$((TOTAL + 1))
+KNOWN_GAP=$((KNOWN_GAP + 1))
+if [[ "$code" -eq 2 ]]; then
+  echo "  KNOWN GAP (now fixed?) [$H] hook DID block -- variable-referenced field/option ids -- consider promoting this to review_gate_case"
+else
+  echo "  KNOWN GAP  [$H] still not blocked -- gh project item-edit with \$FIELD_ID/\$STATUS_ID shell variables (unresolved in the command text) evades the literal-id match, even with failing tests"
+fi
+
 rm -rf "$RTBR_BIN" "$RTBR_NO_STACK" "$RTBR_STACK"
 
 # =========================================================================

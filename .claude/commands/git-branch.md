@@ -16,7 +16,7 @@ description: Create a new branch following project naming conventions
 | Release | `release/<version>` | `release/1.2.0` |
 | Hotfix | `hotfix/<issue-number>-<slug>` | `hotfix/19-null-pointer` |
 
-**Slug rules:** lowercase, hyphens only, max ~30 characters after the prefix. The `feat/` vs `fix/` choice comes from the ticket issue's `type:` label (`type:feature` → `feat/`, anything else → `fix/`).
+**Slug rules:** lowercase, hyphens only, max ~30 characters after the prefix. The `feat/` vs `fix/` choice comes from the ticket issue's `type:` label (`type:feature` → `feat/`, anything else → `fix/`). A `type:question` issue is never branchable — questions aren't board items and aren't implemented; if asked to branch one, say so and stop rather than producing a nonsensical `fix/<N>-<slug>`.
 
 ## Steps
 1. Identify the branch type from context (ticket issue number + its `type:` label, or user description).

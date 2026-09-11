@@ -2,7 +2,7 @@
 name: init
 description: This skill should be used when the user wants to scaffold a fresh project's file structure from the claude-bungus template — e.g. "set up this project", "scaffold the ticket workflow here", "init this repo from the template" — or says "/init" or "/bg:init". Distinct from Claude Code's built-in codebase-documentation /init: this one lays down the PRD workflow files and the GitHub Projects ticket board, not a CLAUDE.md audit of existing code.
 allowed-tools: [Read, Write, Bash, Glob, AskUserQuestion]
-version: 2.0.0
+version: 2.1.0
 ---
 
 # Init
@@ -17,7 +17,7 @@ Tickets and blocking questions live as GitHub Issues, not local files — see `C
 
 1. **Resolve the asset root, once, and reuse it for every copy step below.** The bundled assets live at `${CLAUDE_PLUGIN_ROOT}/templates/`. If `${CLAUDE_PLUGIN_ROOT}` isn't set (e.g. this skill is somehow running standalone rather than as part of the installed plugin), fall back to the current working directory itself (not its `templates/` subdirectory) — so `$ASSET_ROOT/templates/` still resolves to the project's own `./templates/`, matching the plugin-root case — but note this fallback to the user, since it means nothing was actually distributed. Call whichever path wins `ASSET_ROOT` for the rest of this skill's run. Every template file copied in step 3 — `templates/` itself, `DECISIONS.md`, `CHANGELOG.md`, and `CLAUDE.md` — must be sourced from `$ASSET_ROOT`, never from the project's own `./templates/` (which, if step 3 skipped recreating it because the user chose to keep an existing one, could be partial or stale — copying `DECISIONS.md`/`CHANGELOG.md` from it instead of from `$ASSET_ROOT` risks seeding the project root with an outdated or user-modified template instead of the plugin's canonical one).
 
-2. **Check for conflicts.** Glob the current project root for `project blurb.md`, `templates/`, `CLAUDE.md`, `DECISIONS.md`, `CHANGELOG.md`, `.mcp.json`. If any already exist with real content (not just an empty dir or placeholder), list them and ask via `AskUserQuestion` whether to skip each one or overwrite it. Never silently clobber existing work — an empty/placeholder file (e.g. a zero-byte `project blurb.md`, or a `CLAUDE.md` that's still the untouched `[Project Name]` template) is safe to overwrite without asking. If `.mcp.json` already declares a `github` server, treat GitHub MCP as already wired up and skip step 4 entirely.
+2. **Check for conflicts.** Glob the current project root for `project blurb.md`, `templates/`, `CLAUDE.md`, `DECISIONS.md`, `CHANGELOG.md`, `.mcp.json`. If any already exist with real content (not just an empty dir or placeholder), list them and ask via `AskUserQuestion` whether to skip each one or overwrite it. Never silently clobber existing work — an empty/placeholder file (e.g. a zero-byte `project blurb.md`, or a `CLAUDE.md` that's still the untouched `[Project Name]` template) is safe to overwrite without asking. For `.mcp.json` specifically, don't `Read` it to check — the file isn't in this repo's protected-read patterns, so a plain read puts its full contents (auth headers included, even though they should only ever be `${VAR}` references per convention — no reason to rely on that convention when a narrower check costs nothing) into context. Use a redacted existence check instead, e.g. `jq -e '.mcpServers.github // empty' .mcp.json >/dev/null 2>&1` via Bash, which only tells you true/false. If it already declares a `github` server, treat GitHub MCP as already wired up, skip step 4 entirely, and skip the `.mcp.json` write in step 5 (merge/skip logic below still applies to everything else in the file).
 
 3. **Create the local scaffold**, skipping anything the user chose to keep. Every copy sources from `$ASSET_ROOT` (step 1) regardless of what may or may not already exist at the project-local destination:
    - Copy `$ASSET_ROOT/templates/` → `./templates/` (all template files, including the issue-body templates `ticket-feature.md`, `ticket-remediation.md`, `question.md`).
@@ -46,22 +46,22 @@ Tickets and blocking questions live as GitHub Issues, not local files — see `C
    - Create matching labels on the repo (`gh label create`) for anything not modeled as a field: `type:feature`, `type:bug`, `type:tech-debt`, `type:performance`, `type:security`, `priority:critical`, `priority:high`, `priority:medium`, `priority:low`, `effort:s`, `effort:m`, `effort:l`, `effort:xl`, `type:question`. Pick a distinct, low-saturation color per label group (type/priority/effort/question) rather than leaving everything GitHub's random default — skip any label that already exists.
    - Report the project number/URL and remind the user it's now the board `/bg:start-project` and `/bg:implement` will read/write.
 
-5. **Wire up the GitHub MCP server.** Write (or update) `.mcp.json` at the project root:
-   ```json
-   {
-     "mcpServers": {
-       "github": {
-         "type": "http",
-         "url": "https://api.githubcopilot.com/mcp/",
-         "headers": {
-           "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}",
-           "X-MCP-Toolsets": "issues,projects"
-         }
+5. **Wire up the GitHub MCP server.** Skip this step entirely if step 2's redacted check already found `mcpServers.github` — nothing to do. Otherwise:
+   - The `github` entry to add is:
+     ```json
+     "github": {
+       "type": "http",
+       "url": "https://api.githubcopilot.com/mcp/",
+       "headers": {
+         "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}",
+         "X-MCP-Toolsets": "issues,projects"
        }
      }
-   }
-   ```
-   `.mcp.json` is project-scoped and gets checked into git so the whole team gets the same server automatically — never put a literal token in it, only the `${VAR}` reference. Document `GITHUB_PERSONAL_ACCESS_TOKEN` in `CLAUDE.md` under a new `## MCP Servers` section: a classic PAT with `repo` and `project` scopes is the reliable path for both reading/writing issues and reading/writing the Project board; note that fine-grained PATs have historically had narrower or inconsistent Projects v2 support, so point the user at GitHub's current token-creation UI to confirm what's available rather than asserting one exact permission name here. Offer Context7 MCP too, same as before (optional, for live doc lookups) — see `/bg:start-project` step 3f for its config shape, unchanged by this migration.
+     ```
+   - **If `.mcp.json` doesn't exist yet**, write it fresh with just that entry under `mcpServers`.
+   - **If `.mcp.json` already exists** (it has other servers, or the user chose "keep" in step 2 for a file that turned out not to have `github` in it yet), merge — read the existing file, add/replace only `mcpServers.github`, and write the whole object back untouched otherwise. Never regenerate the file from scratch when it already exists; that's exactly what would silently delete an existing Context7 (or any other) entry. If step 2 recorded an explicit "skip" for `.mcp.json` as a whole, honor that and don't write to it at all — tell the user GitHub MCP still needs wiring up by hand in that case.
+
+   `.mcp.json` is project-scoped and gets checked into git so the whole team gets the same servers automatically — never put a literal token in it, only the `${VAR}` reference. Document `GITHUB_PERSONAL_ACCESS_TOKEN` in `CLAUDE.md` under a new `## MCP Servers` section: a classic PAT with `repo` and `project` scopes is the reliable path for both reading/writing issues and reading/writing the Project board; note that fine-grained PATs have historically had narrower or inconsistent Projects v2 support, so point the user at GitHub's current token-creation UI to confirm what's available rather than asserting one exact permission name here. Offer Context7 MCP too, same as before (optional, for live doc lookups) — see `/bg:start-project` step 3f for its config shape, unchanged by this migration.
 
 6. **Report what was created and skipped**, then point the user at the next step: fill in `project blurb.md` with their idea, set `GITHUB_PERSONAL_ACCESS_TOKEN`, then run `/bg:start-project`.
 

@@ -2,7 +2,7 @@
 name: review-tests
 description: This skill should be used when the user asks to validate, chaos-test, or mutation-test the tests for tickets currently in review — e.g. "chaos monkey the tests in review", "mutation-test the tests in review", "run review-tests" — or says "/review-tests".
 allowed-tools: [Read, Edit, Bash, Write, Glob, Grep, mcp__github__list_issues, mcp__github__search_issues, mcp__github__issue_read, mcp__github__projects_get]
-version: 2.0.0
+version: 2.1.0
 ---
 
 # Chaos Monkey Mode
@@ -28,7 +28,7 @@ Before mutating anything, capture a baseline: `git stash create` (or `git diff` 
 ## Process
 
 ### 1. Baseline
-- Query the project board (`projects_get`/`list_issues`) for issues with Ticket Status `Review`, then `issue_read` each one to understand what was implemented and which files were touched.
+- Query the project board for issues with Ticket Status `Review` — the Ticket Status value is a custom per-item field, so it isn't returned by default; pass the field explicitly (e.g. `field_names: ["Ticket Status"]`, or the field's id from `.claude/github-project-config.json`) to whichever `projects_list`/`list_project_items`-style call is actually exposed, or nothing comes back for it. Then `issue_read` each matching issue to understand what was implemented and which files were touched.
 - Run the full test suite. If tests are already failing, **stop here** and report the failures — do not proceed with mutations until the baseline is green.
 
 ### 2. Mutate and observe
