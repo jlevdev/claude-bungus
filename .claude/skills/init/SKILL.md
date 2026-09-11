@@ -2,7 +2,7 @@
 name: init
 description: This skill should be used when the user wants to scaffold a fresh project's file structure from the claude-bungus template — e.g. "set up this project", "scaffold the ticket workflow here", "init this repo from the template" — or says "/init" or "/bg:init". Distinct from Claude Code's built-in codebase-documentation /init: this one lays down the PRD workflow files and the GitHub Projects ticket board, not a CLAUDE.md audit of existing code.
 allowed-tools: [Read, Write, Bash, Glob, AskUserQuestion]
-version: 2.1.0
+version: 2.2.0
 ---
 
 # Init
@@ -58,8 +58,12 @@ Tickets and blocking questions live as GitHub Issues, not local files — see `C
        }
      }
      ```
-   - **If `.mcp.json` doesn't exist yet**, write it fresh with just that entry under `mcpServers`.
-   - **If `.mcp.json` already exists** (it has other servers, or the user chose "keep" in step 2 for a file that turned out not to have `github` in it yet), merge — read the existing file, add/replace only `mcpServers.github`, and write the whole object back untouched otherwise. Never regenerate the file from scratch when it already exists; that's exactly what would silently delete an existing Context7 (or any other) entry. If step 2 recorded an explicit "skip" for `.mcp.json` as a whole, honor that and don't write to it at all — tell the user GitHub MCP still needs wiring up by hand in that case.
+   - **If `.mcp.json` doesn't exist yet, or exists but is empty** (the same zero-byte case step 2 already treats as safe to overwrite — reuse that check here rather than branching on path existence alone, since an empty file isn't valid JSON to merge into), write it fresh with just that entry under `mcpServers`.
+   - **If `.mcp.json` already exists with real content** (it has other servers, or the user chose "keep" in step 2 for a file that turned out not to have `github` in it yet), merge via `jq` — never via the `Read` tool or an unredirected Bash read, both of which would put the whole file's contents, auth headers included, into context for no benefit. Something like:
+     ```bash
+     jq '.mcpServers.github = {"type":"http","url":"https://api.githubcopilot.com/mcp/","headers":{"Authorization":"Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}","X-MCP-Toolsets":"issues,projects"}}' .mcp.json > .mcp.json.tmp && mv .mcp.json.tmp .mcp.json
+     ```
+     writing to a temp file and moving it into place rather than an in-place edit that could corrupt the file on a mid-write failure. This adds/replaces only `mcpServers.github` and leaves everything else in the file untouched — never regenerate the file from scratch when it already exists; that's exactly what would silently delete an existing Context7 (or any other) entry. If step 2 recorded an explicit "skip" for `.mcp.json` as a whole, honor that and don't write to it at all — tell the user GitHub MCP still needs wiring up by hand in that case.
 
    `.mcp.json` is project-scoped and gets checked into git so the whole team gets the same servers automatically — never put a literal token in it, only the `${VAR}` reference. Document `GITHUB_PERSONAL_ACCESS_TOKEN` in `CLAUDE.md` under a new `## MCP Servers` section: a classic PAT with `repo` and `project` scopes is the reliable path for both reading/writing issues and reading/writing the Project board; note that fine-grained PATs have historically had narrower or inconsistent Projects v2 support, so point the user at GitHub's current token-creation UI to confirm what's available rather than asserting one exact permission name here. Offer Context7 MCP too, same as before (optional, for live doc lookups) — see `/bg:start-project` step 3f for its config shape, unchanged by this migration.
 
