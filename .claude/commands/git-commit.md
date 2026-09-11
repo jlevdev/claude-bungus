@@ -17,14 +17,14 @@ description: Stage and commit changes using a conventional commit message
 **Description:** imperative mood, under 72 characters, no period at the end
 
 Examples:
-- `feat(auth): add JWT refresh token flow [feat-3]`
-- `fix(map): correct off-by-one in zoom level calculation [rem-2]`
+- `feat(auth): add JWT refresh token flow [#3]`
+- `fix(map): correct off-by-one in zoom level calculation [#12]`
 - `test(travel): add edge cases for zero-distance journeys`
 
 ## Steps
 1. From the context above, identify what changed and the commit type.
 2. If the user did not specify which files to stage, ask — or confirm "everything" if they say so.
-3. Reference ticket IDs in the message when applicable (append `[feat-N]` or `[rem-N]`).
+3. Reference the ticket issue number in the message when applicable (append `[#N]`).
 4. Add a commit body if the change needs more context beyond the subject line.
 5. Stage the specified files and commit. Never use `--no-verify`.
 

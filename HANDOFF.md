@@ -39,4 +39,4 @@ Both fixes verified directly: piping a synthetic `mkdir -p a/{b,c}` `tool_input.
 
 ## Suggested next step
 
-Write up the remaining `PostToolUse`/`gh`-scoped gap as a proper `rem-N` ticket (`templates/ticket-remediation.md`) so it goes through the normal `/implement` TDD flow.
+Write up the remaining `PostToolUse`/`gh`-scoped gap as a proper remediation ticket (`templates/ticket-remediation.md`, opened as a GitHub issue labeled `type:bug`) so it goes through the normal `/implement` TDD flow.

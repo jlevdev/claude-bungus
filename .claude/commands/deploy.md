@@ -25,7 +25,7 @@ Document everything in `CLAUDE.md` under a `## Deployment` section. All future d
 ## Universal pre-deploy checklist
 Run through this before every deployment:
 - [ ] All tests pass (run the test command from `CLAUDE.md`)
-- [ ] No tickets remain in `tickets/*/in-progress/`
+- [ ] No tickets remain with Ticket Status `In Progress` on the project board
 - [ ] No `.env` files or secrets committed
 - [ ] All required environment variables are set in the target environment
 - [ ] Version number bumped (if the project uses versioning)

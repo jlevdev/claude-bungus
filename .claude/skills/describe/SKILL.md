@@ -1,29 +1,27 @@
 ---
 name: describe
-description: This skill should be used when the user wants a plain-language summary of one or more tickets — e.g. "describe feat-3", "explain what rem-2 is about", "summarize feat-1 and feat-4" — or says "/describe".
-argument-hint: <feat-N|rem-N> [more ticket IDs...]
-allowed-tools: [Read, Glob, Grep]
+description: This skill should be used when the user wants a plain-language summary of one or more tickets — e.g. "describe #12", "explain what #7 is about", "summarize #1 and #4" — or says "/describe".
+argument-hint: <#N> [more issue numbers...]
+allowed-tools: [mcp__github__issue_read, mcp__github__search_issues, mcp__github__projects_get]
 effort: low
-version: 1.1.0
+version: 2.1.0
 ---
 
 # Describe
 
-Give the user a plain-language summary of one or more tickets.
+Give the user a plain-language summary of one or more tickets. Tickets are GitHub Issues on this repo's GitHub Project — see `CLAUDE.md`'s "Ticket System" section for the field schema.
 
 ## Steps
 
-1. Parse the ticket IDs from the request (e.g., `feat-1`, `feat-3`, `rem-2`).
-2. For each ID, search all status subfolders to find the file:
-   - `tickets/features/{todo,in-progress,on-hold,review,done}/`
-   - `tickets/remediation/{todo,in-progress,on-hold,review,done}/`
+1. Parse the issue numbers from the request (e.g., `#12`, `#7`).
+2. For each number, fetch the issue via `issue_read` and its Ticket Status via the project board — pass the field explicitly (`field_names: ["Ticket Status"]`, or the field's id from `.claude/github-project-config.json`) to whichever `projects_get`/`list_project_items`-style call is actually exposed, since it's a custom per-item field and isn't returned by default.
 3. For each ticket found, output:
-   - **[ID] Title** *(status)*
+   - **[#N] Title** *(Ticket Status)*
    - What it does in 2-3 sentences — plain language, no jargon
    - Acceptance criteria as a bulleted list
-   - Dependencies (if any)
-   - Effort estimate and milestone (if set)
-   - ⚠️ **Blocked by:** list any open questions in `questions/open/` whose `blocks` field includes this ticket ID
-4. If an ID is not found in any folder, say so explicitly.
+   - Dependencies (if any) — from the issue body's `## Dependencies` section
+   - Effort/priority (from labels) and milestone (if set)
+   - ⚠️ **Blocked by:** list any open `type:question` issues whose body's `## Blocks` section includes this ticket's number
+4. If a number is not found as an issue, say so explicitly.
 
 Keep the output scannable. No filler text.

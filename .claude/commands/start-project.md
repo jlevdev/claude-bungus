@@ -5,7 +5,7 @@ Guide the user from their project blurb to a fully documented PRD, initial ticke
 
 ## Step 0 — Confirm the scaffold exists
 
-If `templates/`, `tickets/`, and `questions/` aren't present yet, this project hasn't been scaffolded. Run the `init` skill first (`/bg:init` in a downstream project) — it lays down those directories, `DECISIONS.md`, `CHANGELOG.md`, and a starter `CLAUDE.md` before this command tries to fill any of them in. (This template repo itself already carries this scaffolding for its own dogfooding use, so this step should never trigger here — `/init` isn't meant to be run in this repo; see its entry in the Available Commands & Skills table below.)
+If `templates/`, `DECISIONS.md`, `CHANGELOG.md`, or `.mcp.json` (with a `github` server declared) aren't present yet, this project hasn't been scaffolded. Run the `init` skill first (`/bg:init` in a downstream project) — it lays down `templates/`, `DECISIONS.md`, `CHANGELOG.md`, a starter `CLAUDE.md`, a GitHub Project board for tickets, and `.mcp.json` before this command tries to fill any of them in. (This template repo itself already carries the local scaffolding for its own dogfooding use, so this step should never trigger here — `/init` isn't meant to be run in this repo; see its entry in the Available Commands & Skills table below.)
 
 ## Step 1 — Read the blurb
 Look for `project blurb.md` in the project root. Read it fully. If it doesn't exist, ask the user to either create one or paste their idea directly.
@@ -49,8 +49,16 @@ Before finalizing any tech stack choice that requires evaluating unfamiliar opti
 ### 3b. PRD.md (project root)
 Use `templates/PRD.md` as the base. Fill in every section that you can. Leave placeholders where information is still unknown. Flag open questions explicitly.
 
-### 3c. Initial feature tickets (tickets/features/todo/)
-Break the MVP into logical, independently-implementable chunks. Aim for 4–10 tickets for an MVP. Avoid making tickets too large (max L effort). Use `templates/ticket-feature.md` for each. Name files `feat-1-<slug>.md`, `feat-2-<slug>.md`, etc.
+### 3c. Initial feature tickets (as GitHub issues on the project board)
+Break the MVP into logical, independently-implementable chunks. Aim for 4–10 tickets for an MVP. Avoid making tickets too large (max L effort). This needs the GitHub Project board `/bg:init` provisioned (confirmed in Step 0) — if somehow missing, stop and run that skill's board-provisioning step before continuing.
+
+For each: `gh issue create --title "<title>" --body "$(cat templates/ticket-feature.md filled in)" --label type:feature,priority:<p>,effort:<e>`, then add it to the project board and set its Ticket Status to `Todo`: `gh project item-add <project-number> --owner <owner> --url <issue-url> --format json` (capture the returned item id), then edit it using the field/option ids from `.claude/github-project-config.json` (written by `/bg:init` — don't re-derive them):
+```bash
+gh project item-edit --id <item-id> \
+  --project-id "$(jq -r '.project.id' .claude/github-project-config.json)" \
+  --field-id "$(jq -r '.ticketStatusField.id' .claude/github-project-config.json)" \
+  --single-select-option-id "$(jq -r '.ticketStatusField.options.Todo' .claude/github-project-config.json)"
+```
 
 Think about natural sequencing — foundational infrastructure before UI, auth before protected routes, data model before business logic.
 
@@ -63,11 +71,11 @@ Fill in:
 - Known Constraints
 - Out of Scope
 
-### 3d-ii. Open questions (questions/open/)
-Any questions that came up during the PRD discussion that remain unanswered and block specific tickets should be written to `questions/open/` using `templates/question.md`. Name files `q-1-<slug>.md`, `q-2-<slug>.md`, etc. Link each question to the ticket(s) it blocks in the `blocks` field. Do not create question files for questions that were answered during the conversation — only for those that need external input or a decision the user hasn't made yet.
+### 3d-ii. Open questions (as GitHub issues)
+Any questions that came up during the PRD discussion that remain unanswered and block specific tickets should be opened as GitHub issues labeled `type:question`, using `templates/question.md`'s structure for the body. Reference the ticket issue number(s) each one blocks in its `## Blocks` section. Do not open question issues for questions that were answered during the conversation — only for those that need external input or a decision the user hasn't made yet.
 
 ### 3d-iii. Decision log and changelog (repo root)
-Copy `templates/DECISIONS.md` to `DECISIONS.md` and `templates/CHANGELOG.md` to `CHANGELOG.md` at the project root, unmodified — both are tool-maintained from here on (`research` and `implement` append ADR entries to `DECISIONS.md`; `/git-clean` appends shipped-ticket entries to `CHANGELOG.md` as tickets merge). If any tech-stack decisions were already settled during Step 3a's research, add those as the first ADR entries in `DECISIONS.md` now rather than waiting for a future `/research` invocation to record them retroactively. `CLAUDE.md` already links both files from its "Key Decisions"/"Recent Changes" sections — this step is what makes those links resolve to something instead of a 404.
+Copy `templates/DECISIONS.md` to `DECISIONS.md` and `templates/CHANGELOG.md` to `CHANGELOG.md` at the project root, unmodified — both are tool-maintained from here on (`research` and `implement` append ADR entries to `DECISIONS.md`; `/wrap-up` appends shipped-ticket entries to `CHANGELOG.md` as tickets merge). If any tech-stack decisions were already settled during Step 3a's research, add those as the first ADR entries in `DECISIONS.md` now rather than waiting for a future `/research` invocation to record them retroactively. `CLAUDE.md` already links both files from its "Key Decisions"/"Recent Changes" sections — this step is what makes those links resolve to something instead of a 404.
 
 ### 3e. Initialize git
 ```bash
@@ -77,21 +85,16 @@ git commit -m "chore: initialize project from template"
 ```
 
 ### 3f. Optional MCP servers
-Two MCP servers are commonly worth wiring up once the stack is known — offer them, don't assume:
+GitHub MCP is already wired up by `/bg:init` (confirmed in Step 0) — nothing to do here for it. One more is commonly worth offering once the stack is known:
 
-- **GitHub MCP** (only if GitHub was chosen as the git platform in Step 2): lets Claude create/manage issues and PRs and search the repo directly via MCP tools instead of shelling out to `gh` for everything. Requires a `GITHUB_PERSONAL_ACCESS_TOKEN` environment variable (a fine-grained PAT scoped to this repo — contents, pull requests, and issues permissions — is enough).
 - **Context7 MCP**: live documentation lookup for whatever libraries ended up in the tech stack, instead of relying on training data that can be stale or hallucinate APIs. Works anonymously with a shared rate limit, or with an optional `CONTEXT7_API_KEY` for a dedicated quota.
 
-If the user wants either, write `.mcp.json` at the project root, including only the servers they opted into:
+If the user wants it, add it to the existing `.mcp.json` alongside the `github` entry `/bg:init` already wrote:
 
 ```json
 {
   "mcpServers": {
-    "github": {
-      "type": "http",
-      "url": "https://api.githubcopilot.com/mcp/",
-      "headers": { "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}" }
-    },
+    "github": { "...": "already present from /bg:init" },
     "context7": {
       "type": "http",
       "url": "https://mcp.context7.com/mcp",
@@ -101,24 +104,24 @@ If the user wants either, write `.mcp.json` at the project root, including only 
 }
 ```
 
-`.mcp.json` is project-scoped and gets checked into git so the whole team gets the same servers automatically — never put a literal token in it, only the `${VAR}` reference. Document whichever environment variables are actually required in `CLAUDE.md` under a new `## MCP Servers` section so the next person (or agent) knows to set them before the server will connect.
+Document `CONTEXT7_API_KEY` (if used) in `CLAUDE.md`'s `## MCP Servers` section alongside the `GITHUB_PERSONAL_ACCESS_TOKEN` entry `/bg:init` already wrote there.
 
-Step 3e's init commit already ran before this step, so `.mcp.json` (and the `CLAUDE.md` update above) are untracked at this point if either was created — commit them now:
+Step 3e's init commit already ran before this step, so `.mcp.json` (and the `CLAUDE.md` update above) are untracked at this point if either changed — commit them now:
 ```bash
 git add .mcp.json CLAUDE.md
-git commit -m "chore: configure MCP servers"
+git commit -m "chore: configure Context7 MCP"
 ```
 
 ## Step 4 — Walk the user through it
 Summarize what was created:
 - PRD location and key decisions recorded
 - `DECISIONS.md`/`CHANGELOG.md` initialized, and any ADR entries already recorded from Step 3a
-- Ticket count and a quick list of feat-1 through feat-N titles
+- Ticket count and a quick list of the created issue numbers/titles
 - First recommended sprint (which tickets to tackle first)
 - Any MCP servers wired up (and which environment variables still need to be set before they'll connect)
 - Any open questions still outstanding
 
-Ask if anything needs adjustment before implementation begins. If there are open questions in `questions/open/`, remind the user to answer them before those tickets can be implemented.
+Ask if anything needs adjustment before implementation begins. If there are open `type:question` issues, remind the user to answer (close) them before the tickets they block can be implemented.
 
 ## Notes for future projects
 - For Unreal Engine projects: ask about engine version, target platform (PC/console/mobile), and whether blueprints-only or C++ is in scope
