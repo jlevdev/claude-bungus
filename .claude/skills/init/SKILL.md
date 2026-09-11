@@ -2,7 +2,7 @@
 name: init
 description: This skill should be used when the user wants to scaffold a fresh project's file structure from the claude-bungus template — e.g. "set up this project", "scaffold the ticket workflow here", "init this repo from the template" — or says "/init" or "/bg:init". Distinct from Claude Code's built-in codebase-documentation /init: this one lays down the PRD workflow files and the GitHub Projects ticket board, not a CLAUDE.md audit of existing code.
 allowed-tools: [Read, Write, Bash, Glob, AskUserQuestion]
-version: 2.2.0
+version: 2.3.0
 ---
 
 # Init
@@ -59,7 +59,7 @@ Tickets and blocking questions live as GitHub Issues, not local files — see `C
      }
      ```
    - **If `.mcp.json` doesn't exist yet, or exists but is empty** (the same zero-byte case step 2 already treats as safe to overwrite — reuse that check here rather than branching on path existence alone, since an empty file isn't valid JSON to merge into), write it fresh with just that entry under `mcpServers`.
-   - **If `.mcp.json` already exists with real content** (it has other servers, or the user chose "keep" in step 2 for a file that turned out not to have `github` in it yet), merge via `jq` — never via the `Read` tool or an unredirected Bash read, both of which would put the whole file's contents, auth headers included, into context for no benefit. Something like:
+   - **If `.mcp.json` already exists with real content** (it has other servers, or the user chose "keep" in step 2 for a file that turned out not to have `github` in it yet), first confirm the root is actually a JSON object — `jq -e 'type == "object"' .mcp.json >/dev/null 2>&1` — before attempting to merge into it. A valid-but-wrong-shaped file (e.g. a bare array) parses fine but can't be indexed with `.mcpServers`, so the merge below would fail; don't let that fail silently. If the root isn't an object, stop and report the file's invalid shape to the user rather than guessing — only overwrite it if they explicitly choose to. If it is an object, merge via `jq` — never via the `Read` tool or an unredirected Bash read, both of which would put the whole file's contents, auth headers included, into context for no benefit:
      ```bash
      jq '.mcpServers.github = {"type":"http","url":"https://api.githubcopilot.com/mcp/","headers":{"Authorization":"Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}","X-MCP-Toolsets":"issues,projects"}}' .mcp.json > .mcp.json.tmp && mv .mcp.json.tmp .mcp.json
      ```

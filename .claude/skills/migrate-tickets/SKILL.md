@@ -3,7 +3,7 @@ name: migrate-tickets
 description: This skill should be used when the user wants to migrate an existing project's .md-file tickets and questions (tickets/features/*, tickets/remediation/*, questions/open|answered/*) onto this repo's GitHub Issues + Projects workflow — e.g. "migrate our tickets to GitHub", "convert the old ticket files", "move to the new ticket system" — or says "/migrate-tickets" or "/bg:migrate-tickets". One-time migration for a project that started on the old file-based system before it moved to GitHub; the ongoing workflow afterward is `/bg:implement`, `/bg:whats-next`, `/bg:describe`, `/bg:wrap-up` — this skill doesn't replace any of those, it just gets a project from the old state to the new one.
 argument-hint: (no arguments — scans the whole tickets/ and questions/ trees)
 allowed-tools: [Read, Write, Bash, Glob, Grep, AskUserQuestion, mcp__github__issue_read, mcp__github__issue_write, mcp__github__search_issues, mcp__github__list_issues]
-version: 1.2.0
+version: 1.3.0
 ---
 
 # Migrate Tickets
@@ -34,7 +34,7 @@ Before creating anything, show: total tickets by type and target Ticket Status, 
 
 Every issue this skill creates gets `<!-- migrated-from: <old-id> -->` as the first line of its body (invisible in GitHub's rendered view, same convention as this repo's other issue-body templates using HTML comments for non-content notes). Before creating an issue for a given old id, `search_issues` for an existing open-or-closed issue whose body contains that exact marker — if found, reuse its issue number for the mapping table in Step 7, but **don't assume it's fully migrated just because it exists** — a prior interrupted run could have created it and stopped before finishing its other side effects. Reconcile before moving on:
 - **Ticket:** is it on the project board with Ticket Status matching its source folder? If not, add it / set status now, same as Step 6 would for a freshly-created one. If its source folder is `tickets/**/done/`, is it actually closed? If not, close it now.
-- **Question:** if its source folder is `questions/answered/`, is it actually closed with the answer comment posted? If it's still open, post the closing comment and close it now, same as Step 6 would.
+- **Question:** if its source folder is `questions/answered/`, check the comment and the closed state **independently, not as one combined step** — a retry could have posted the comment but failed before closing, or closed the issue in some other way without ever posting the comment. Post the `## Answer`/`## Resolution Impact` content as a comment only if it isn't already there (check existing comments for it first); close the issue only if it's still open. Don't assume one implies the other.
 
 Only skip a reused item's body/label/field *creation* (title, labels, initial body) — those were already set correctly by whatever created it. This makes a re-run after a partial/interrupted migration genuinely safe end-to-end, not just safe against re-creating duplicate issues.
 
