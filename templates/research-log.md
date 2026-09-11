@@ -1,7 +1,7 @@
 ---
 date: YYYY-MM-DD
 topic: [What is being evaluated]
-requested-by: [feat-N | user | start-project]
+requested-by: [#N | user | start-project]
 status: draft | complete
 ---
 
@@ -57,5 +57,5 @@ status: draft | complete
 **What would change this recommendation:**
 
 ## Open Questions
-*(Any unresolved questions — create corresponding q-N files in questions/open/)*
+*(Any unresolved questions — open corresponding GitHub issues labeled `type:question`)*
 - [ ]

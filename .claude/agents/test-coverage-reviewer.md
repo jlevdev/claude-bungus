@@ -1,6 +1,6 @@
 ---
 name: test-coverage-reviewer
-description: Use this agent to check whether the tests written for a ticket actually cover its acceptance criteria and realistic edge cases — behavioral coverage, not line coverage. Invoked automatically at the end of the implement skill's TDD workflow. Distinct from the review-tests skill/chaos-monkey pass, which mutates code to test the robustness of tests already in review/; this agent checks completeness before a ticket gets there. Can also be triggered manually, e.g. "check test coverage for feat-3".
+description: Use this agent to check whether the tests written for a ticket actually cover its acceptance criteria and realistic edge cases — behavioral coverage, not line coverage. Invoked automatically at the end of the implement skill's TDD workflow. Distinct from the review-tests skill/chaos-monkey pass, which mutates code to test the robustness of tests on tickets already at Ticket Status Review; this agent checks completeness before a ticket gets there. Can also be triggered manually, e.g. "check test coverage for #12".
 model: inherit
 color: cyan
 ---
@@ -25,7 +25,7 @@ Rate each gap 1-10 on criticality:
 ## Output format
 
 ```text
-## Test Coverage Review: <ticket id>
+## Test Coverage Review: #<N>
 
 ### Coverage by Criterion
 - <criterion>: covered by <test name> / NOT COVERED

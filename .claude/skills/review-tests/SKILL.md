@@ -1,18 +1,18 @@
 ---
 name: review-tests
 description: This skill should be used when the user asks to validate, chaos-test, or mutation-test the tests for tickets currently in review — e.g. "chaos monkey the tests in review", "mutation-test the tests in review", "run review-tests" — or says "/review-tests".
-allowed-tools: [Read, Edit, Bash, Write, Glob, Grep]
-version: 1.0.0
+allowed-tools: [Read, Edit, Bash, Write, Glob, Grep, mcp__github__list_issues, mcp__github__search_issues, mcp__github__issue_read, mcp__github__projects_get]
+version: 2.0.0
 ---
 
 # Chaos Monkey Mode
 
-> **Goal:** verify that tests for items currently in `review` are robust enough to catch regressions.
+> **Goal:** verify that tests for tickets currently at Ticket Status `Review` are robust enough to catch regressions.
 
 ## Hard boundaries — read before doing anything
 
 **IN BOUNDS:**
-- Source files directly relevant to tickets in `tickets/features/review/` and `tickets/remediation/review/`
+- Source files directly relevant to tickets whose Ticket Status is `Review` on the project board
 
 **OUT OF BOUNDS — never touch these:**
 - OS files, system configs, package manager files
@@ -28,7 +28,7 @@ Before mutating anything, capture a baseline: `git stash create` (or `git diff` 
 ## Process
 
 ### 1. Baseline
-- Read all tickets in `tickets/features/review/` and `tickets/remediation/review/` to understand what was implemented and which files were touched.
+- Query the project board (`projects_get`/`list_issues`) for issues with Ticket Status `Review`, then `issue_read` each one to understand what was implemented and which files were touched.
 - Run the full test suite. If tests are already failing, **stop here** and report the failures — do not proceed with mutations until the baseline is green.
 
 ### 2. Mutate and observe
@@ -46,14 +46,14 @@ After each mutation:
 3. **Revert the mutation immediately.**
 
 ### 3. Record findings
-Write results to `tickets/test-review-YYYY-MM-DD.md`:
+Write results to `test-reviews/test-review-YYYY-MM-DD.md`:
 
 ```markdown
 # Test Review — YYYY-MM-DD
 
 ## Tickets in Scope
-- feat-N: [title]
-- rem-N: [title]
+- #N: [title]
+- #M: [title]
 
 ## Summary
 X mutations applied. Y caught by tests (✅). Z not caught (❌).

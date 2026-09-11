@@ -34,12 +34,13 @@ EOF
 - [ ] <another step>
 
 ## Tickets
-Closes: feat-N, rem-N
+Closes: #N, #M
 ```
+Using GitHub's native closing-keyword syntax (`Closes: #N`) means the referenced issue auto-closes when this PR merges — don't substitute a plain `#N` mention if the intent is actually "this PR finishes that ticket."
 
 ## Steps
 1. If this project's `CLAUDE.md` specifies GitLab, the context above doesn't apply — it's a GitHub-only prefetch. Run `glab mr view` instead to check for an existing merge request before creating one. Otherwise, check the context above — if a PR already exists for this branch, show it to the user and ask whether they want to update it instead of creating a new one.
-2. Read the ticket files referenced in commit messages for context.
+2. Look up the ticket issue(s) referenced in commit messages (`gh issue view <N>`) for context.
 3. Draft the title (under 70 chars) and body using the template above.
 4. Confirm the draft with the user before creating.
 5. Create the PR and return the URL.

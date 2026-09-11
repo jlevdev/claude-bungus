@@ -51,7 +51,7 @@ Summarize:
 - **Recommended option** and the primary reason
 - **Runner-up** and why it wasn't chosen
 - **What would change the recommendation** (if X changes, switch to Y)
-- **Open questions** that remain — create `q-N` files in `questions/open/` for any that block a ticket
+- **Open questions** that remain — open a GitHub issue labeled `type:question` (using `templates/question.md`'s structure) for any that block a ticket
 
 ### Step 7 — Record the decision, if it's a real one
 Not every research log is decision-worthy — a lot of what this skill evaluates is minor or reversible. Only proceed with this step if the recommendation from Step 6 sets or changes a real architectural/product decision (a tech-stack pick, a library that shapes how the codebase is built, an approach that would be costly to reverse later). Skip it silently for anything smaller — don't ask about recording something that isn't a decision worth remembering.

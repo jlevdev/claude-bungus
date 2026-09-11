@@ -1,11 +1,13 @@
----
-id: feat-N
-title: Feature title here
-priority: high | medium | low
-effort: S | M | L | XL
-milestone: M1 | M2 | M3
-created: YYYY-MM-DD
----
+<!--
+Issue-body template for a feature ticket. This is pasted into `issue_write`'s (or `gh issue create --body`'s)
+body — it is not saved as a standalone file. The issue itself carries: number (the ticket ID, referenced as
+#N), title, and the following labels/metadata set alongside creation:
+  - type:feature
+  - priority:critical | priority:high | priority:medium | priority:low
+  - effort:s | effort:m | effort:l | effort:xl
+  - Milestone (native GitHub milestone, e.g. M1) if one applies
+  - Added to the repo's GitHub Project with Ticket Status = Todo
+-->
 
 ## Description
 
@@ -23,8 +25,8 @@ created: YYYY-MM-DD
 
 ## Dependencies
 
-- **Depends on:** [feat-N, rem-N, or external system — or "none"]
-- **Blocks:** [feat-N, rem-N — or "none"]
+- **Depends on:** [#N, #M, or an external system — or "none"]
+- **Blocks:** [#N, #M — or "none"]
 
 ## Test Coverage Required
 

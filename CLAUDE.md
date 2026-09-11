@@ -53,63 +53,47 @@
 
 ## Project Management System
 
-This project uses a ticket-based PRD workflow. All planning lives in markdown files so both the developer and Claude can reference it at any time.
+This project uses a ticket-based PRD workflow. Tickets and blocking questions live as **GitHub Issues** on a dedicated GitHub Project (v2) board, reachable both via the GitHub MCP server (for skills that reason over ticket content) and the `gh` CLI (for deterministic, scripted status changes) — see `### MCP Servers` below for how that's wired up.
 
 ### Questions
 
-Unanswered questions that block feature development live in `questions/`:
+An unanswered question that blocks a ticket is an **open** GitHub issue labeled `type:question`, using `templates/question.md`'s structure for the body. Its `## Blocks` section references the ticket issue number(s) it blocks. Answering a question = closing the issue, with the answer and its resolution impact written as the closing comment — the comment thread is the record of when and why it was resolved, so the body itself is never edited to add the answer.
 
-```
-questions/
-  open/       ← questions awaiting an answer
-  answered/   ← resolved questions (kept for reference)
-```
-
-Question files are named `q-N-<slug>.md` and use `templates/question.md`. Each question lists which ticket IDs it blocks. When you answer a question, fill in the Answer section and move the file to `questions/answered/`.
-
-Claude will create question files automatically when hitting genuine implementation blockers, and will surface open questions in `/whats-next`, `/describe`, and `/implement`.
+Claude will open question issues automatically when hitting genuine implementation blockers, and will surface open ones in `/whats-next`, `/describe`, and `/implement`.
 
 ### Ticket System
 
-Tickets live in `tickets/` and move through status folders as work progresses:
+Each ticket is a GitHub Issue on the project board, referenced everywhere as `#N` (its issue number — replaces a separate ID scheme entirely). Field schema:
 
-```
-tickets/
-  features/
-    todo/           ← planned, not started
-    in-progress/    ← being implemented
-    on-hold/        ← blocked or deferred
-    review/         ← implementation done, awaiting test/review pass
-    done/           ← accepted and merged
-  remediation/      ← same structure for bugs and tech debt
-    todo/
-    in-progress/
-    on-hold/
-    review/
-    done/
-```
+| Field | Mechanism | Values |
+|-------|-----------|--------|
+| Ticket Status | Custom Project field (single-select) — the board's status column | `Todo` / `In Progress` / `On Hold` / `Review` / `Done` |
+| Type | Label | `type:feature` / `type:bug` / `type:tech-debt` / `type:performance` / `type:security` (also what `feat/` vs `fix/` branch naming reads) |
+| Priority | Label | `priority:critical` / `priority:high` / `priority:medium` / `priority:low` |
+| Effort | Label | `effort:s` / `effort:m` / `effort:l` / `effort:xl` |
+| Milestone | Native GitHub milestone | e.g. `M1`, `M2` |
+| Description, Acceptance Criteria, Technical Notes, Dependencies, Test Coverage Required, Design/Assets, Steps to Reproduce, Expected/Actual Behavior, Root Cause | Issue body markdown | free text — see `templates/ticket-feature.md` / `templates/ticket-remediation.md` |
 
-**Ticket IDs:**
-- Features: `feat-N` (e.g., `feat-1`, `feat-12`)
-- Remediation: `rem-N` (e.g., `rem-1`, `rem-5`)
-- Filenames: `<id>-<short-slug>.md` (e.g., `feat-3-user-auth.md`)
+`Ticket Status` is deliberately a *new* custom field rather than GitHub's built-in default "Status" field — the API that creates project fields can set a single-select field's options at creation time, but there's no supported way to edit the option set of an already-existing single-select field, so the built-in field can't be scripted to this workflow's 5 values. The default Status field may still be visible on the board; it's unused by this workflow and can be hidden from the view if it's confusing.
 
-Templates are in `templates/`.
+Dependencies stay as free text (`Depends on: #12` / `Blocks: #15`) rather than a structured relationship — every skill that reads it only displays it, never parses it programmatically.
+
+Issue-body templates are in `templates/`. Field/option ids for the board (project id, Ticket Status field id, and each status option's id) live in `.claude/github-project-config.json`, written once by `/init` when the board is provisioned — every skill/command/hook that needs to resolve a status name to an id reads from there rather than re-deriving it.
 
 ### Living Documents
 
 `DECISIONS.md` and `CHANGELOG.md` (repo root, created from `templates/` by `/start-project`) are tool-maintained — hand-editing them still works, but it isn't the default way they get updated:
 
 - **`DECISIONS.md`** gets a new ADR entry from `/research` (Step 7, when a research conclusion sets or changes a real architectural/product decision) and from `/implement` (end of a ticket, only if that ticket's work involved a decision not obvious from the code). Both draft the entry and confirm with the user via `AskUserQuestion` before appending — this file stays curated, not a firehose.
-- **`CHANGELOG.md`** gets an entry from `/git-clean`, which closes out any tickets a newly-merged branch shipped (moving them `review/` → `done/`) and appends a summary line automatically, no confirmation needed — it's a mechanical record of a merge that already happened.
+- **`CHANGELOG.md`** gets an entry from `/wrap-up`, which closes out any tickets a newly-merged branch shipped (setting Ticket Status to `Done`) and appends a summary line automatically, no confirmation needed — it's a mechanical record of a merge that already happened.
 
 ### Sprint Flow
 
-1. Tickets are written in `todo`
-2. `/implement feat-N` moves them to `in-progress` and builds with TDD — offers (doesn't default to) isolating the work in a git worktree first, so a bad TDD cycle stays on a disposable branch
-3. Before moving to `review`, the `ticket-reviewer`, `silent-failure-hunter`, and `test-coverage-reviewer` subagents check the diff against the ticket's acceptance criteria, error handling, and test coverage — blocking findings get fixed first, notes carry into the ticket summary
+1. Tickets are opened as GitHub issues with Ticket Status `Todo`
+2. `/implement #N` sets Ticket Status to `In Progress` and builds with TDD — offers (doesn't default to) isolating the work in a git worktree first, so a bad TDD cycle stays on a disposable branch
+3. Before setting Ticket Status to `Review`, the `ticket-reviewer`, `silent-failure-hunter`, and `test-coverage-reviewer` subagents check the diff against the ticket's acceptance criteria, error handling, and test coverage — blocking findings get fixed first, notes carry into the ticket summary
 4. Developer reviews; `/review-tests` runs chaos monkey validation
-5. Once the PR is accepted and merged, `/git-clean` moves the ticket to `done` and logs it in `CHANGELOG.md`
+5. Once the PR is accepted and merged (via `Closes: #N` in the PR body, so GitHub auto-closes the issue), `/wrap-up` sets Ticket Status to `Done` and logs it in `CHANGELOG.md`
 
 ### Available Commands & Skills
 
@@ -119,11 +103,12 @@ Cost tiering: a skill that's read-only, single-shot, and never calls `AskUserQue
 
 | Name | Type | What it does |
 |------|------|-------------|
-| `/init` (this repo) | skill | Scaffolds `project blurb.md`, `templates/`, `tickets/`, `questions/`, `DECISIONS.md`, `CHANGELOG.md`, and a starter `CLAUDE.md` into a downstream project that installed the `bg` plugin. Not meant to be run in this template repo itself — it exists to ship to downstream projects (see "Distributing This Toolkit" below); invoked there as `/bg:init` |
+| `/init` (this repo) | skill | Scaffolds `project blurb.md`, `templates/`, `DECISIONS.md`, `CHANGELOG.md`, a starter `CLAUDE.md`, a GitHub Project board for tickets, and `.mcp.json` into a downstream project that installed the `bg` plugin. Not meant to be run in this template repo itself — it exists to ship to downstream projects (see "Distributing This Toolkit" below); invoked there as `/bg:init` |
+| `/migrate-tickets` | skill (`.claude/skills/migrate-tickets/`) | One-time migration of an existing project's old `.md`-file tickets/questions onto GitHub Issues + Projects — for a project that started before this toolkit moved off files |
 | `/start-project` | command | Initialize a new project from a blurb — creates PRD, initial tickets, and git repo |
 | `/research` | skill (`.claude/skills/research/`) | Evaluate technology options with prompt-injection awareness and package vetting |
-| `/implement feat-N` | skill (`.claude/skills/implement/`) | Enter TDD implementation mode for one or more tickets |
-| `/describe feat-N` | skill (`.claude/skills/describe/`) | Summarize one or more tickets in plain language |
+| `/implement #N` | skill (`.claude/skills/implement/`) | Enter TDD implementation mode for one or more tickets |
+| `/describe #N` | skill (`.claude/skills/describe/`) | Summarize one or more tickets in plain language |
 | `/whats-next` | skill (`.claude/skills/whats-next/`) | Overview of all in-progress and todo work |
 | `/review-tests` | skill (`.claude/skills/review-tests/`) | Chaos monkey validation of tests for items in review |
 | `/pr-review [PR\|branch]` | skill (`.claude/skills/pr-review/`) | Read-only, severity-tagged review of a finished PR via parallel subagents — see below |
@@ -131,7 +116,7 @@ Cost tiering: a skill that's read-only, single-shot, and never calls `AskUserQue
 | `/git-commit` | command | Stage and commit with conventional commit message |
 | `/git-branch` | command | Create a branch following naming conventions |
 | `/git-pr` | command | Open a pull request or merge request |
-| `/git-clean` | command | Delete local branches/worktrees whose remote is gone; close out any tickets that branch shipped (`review/` → `done/`, logged to `CHANGELOG.md`) |
+| `/wrap-up` | command | Delete local branches/worktrees whose remote is gone; close out any tickets that branch shipped (Ticket Status → `Done`, logged to `CHANGELOG.md`) |
 | `/git-ship` | command | Branch (if needed), commit, push, and open a PR in one step |
 | `/deploy` | command | Pre-deploy checklist and deployment execution |
 
@@ -152,7 +137,12 @@ Defined in `.claude/agents/`, invoked automatically (by `implement`'s reviewer g
 
 ### MCP Servers
 
-None configured in the template itself. `/start-project` offers to wire up GitHub (issue/PR management) and Context7 (live docs lookup) once the tech stack and git platform are known — see its "Optional MCP servers" step. When added, servers live in a project-root `.mcp.json` and required environment variables get documented in a `## MCP Servers` section here.
+None configured in the template itself (this repo dogfoods `.claude/` directly but hasn't provisioned a live board for itself — see `### Ticket System` above). In a downstream project:
+
+- **GitHub MCP** — wired up by `/init` (not optional; the ticket workflow depends on it), pointed at `https://api.githubcopilot.com/mcp/` with `X-MCP-Toolsets: issues,projects` so both the default `issues` toolset and the opt-in `projects` toolset (needed for the Ticket Status field) are available. Requires a `GITHUB_PERSONAL_ACCESS_TOKEN` environment variable — a classic PAT with `repo` and `project` scopes is the reliable path for both issue and Project-board access; fine-grained PATs have historically had narrower/inconsistent Projects v2 support, so confirm current coverage in GitHub's token-creation UI before relying on one.
+- **Context7** — offered by `/start-project` (live docs lookup), fully optional, unrelated to the ticket workflow.
+
+Both live in a project-root `.mcp.json`; required environment variables get documented in this section once a downstream project sets them.
 
 ### Distributing This Toolkit
 

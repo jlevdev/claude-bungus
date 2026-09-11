@@ -121,7 +121,7 @@ run_case "$H" block "force push with --force"                    "$(bash_input '
 run_case "$H" block "force push with -f"                         "$(bash_input 'git push -f origin main')"
 run_case "$H" block "push straight to origin main"                "$(bash_input 'git push origin main')"
 run_case "$H" block "gh repo delete"                              "$(bash_input 'gh repo delete someorg/somerepo')"
-run_case "$H" allow "push to origin on a feature branch"          "$(bash_input 'git push origin feat/rem-1-hook-bypass-tests')"
+run_case "$H" allow "push to origin on a feature branch"          "$(bash_input 'git push origin feat/1-hook-bypass-tests')"
 run_case "$H" allow "an ordinary git commit"                      "$(bash_input 'git commit -m "wip"')"
 
 section "git-safety.sh -- remote name other than origin/upstream [fixed 2026-08-10]"
@@ -275,10 +275,11 @@ run_known_gap "guard-secret-bash-access.sh" "reading .env via a pre-existing sym
 # =========================================================================
 section "require-tests-before-review.sh"
 # =========================================================================
-# Only Bash `mv`/`git mv` commands whose destination lands in a
-# tickets/**/review/ folder are in scope; the hook cd's into
-# $CLAUDE_PROJECT_DIR and shells out to whatever test command it detects
-# there. A real npm/pytest/cargo/go toolchain isn't assumed to be
+# Only Bash `gh project item-edit` commands whose --field-id/
+# --single-select-option-id pair resolves (via .claude/github-project-
+# config.json) to the Ticket Status field's Review option are in scope; the
+# hook cd's into $CLAUDE_PROJECT_DIR and shells out to whatever test command
+# it detects there. A real npm/pytest/cargo/go toolchain isn't assumed to be
 # installed -- a fixture `npm` is shimmed onto PATH ahead of the real one,
 # so this section tests the hook's own detect-and-gate logic (does it run
 # something, does it honor the exit code) rather than a real test run.
@@ -287,6 +288,13 @@ RTBR_BIN=$(mktemp -d)
 RTBR_NO_STACK=$(mktemp -d)
 RTBR_STACK=$(mktemp -d)
 echo '{"name":"fixture","scripts":{"test":"whatever"}}' > "$RTBR_STACK/package.json"
+RTBR_FIELD_ID="PVTSSF_fixture123"
+RTBR_REVIEW_ID="opt_review_456"
+RTBR_DONE_ID="opt_done_789"
+mkdir -p "$RTBR_STACK/.claude"
+cat > "$RTBR_STACK/.claude/github-project-config.json" <<EOF
+{"ticketStatusField":{"id":"$RTBR_FIELD_ID","options":{"Todo":"opt_todo_123","In Progress":"opt_inprog_234","On Hold":"opt_hold_345","Review":"$RTBR_REVIEW_ID","Done":"$RTBR_DONE_ID"}}}
+EOF
 
 review_gate_case() {
   local desc="$1" expected="$2" command="$3" project_dir="$4" npm_exit="${5:-}"
@@ -311,16 +319,16 @@ review_gate_case() {
   fi
 }
 
-review_gate_case "mv not touching tickets/**/review/ is ignored, regardless of tests" \
+review_gate_case "unrelated command is ignored, regardless of tests" \
   allow "mv foo.txt bar.txt" "$RTBR_NO_STACK"
-review_gate_case "mv into review/ with no stack detected yet allows through (best-effort)" \
-  allow "git mv tickets/features/todo/feat-1-x.md tickets/features/review/feat-1-x.md" "$RTBR_NO_STACK"
-review_gate_case "mv into review/ with a detected stack and passing tests" \
-  allow "git mv tickets/features/todo/feat-1-x.md tickets/features/review/feat-1-x.md" "$RTBR_STACK" 0
-review_gate_case "mv into review/ with a detected stack and failing tests is blocked" \
-  block "git mv tickets/features/todo/feat-1-x.md tickets/features/review/feat-1-x.md" "$RTBR_STACK" 1
-review_gate_case "same gate applies to tickets/remediation/review/" \
-  block "mv tickets/remediation/todo/rem-2-x.md tickets/remediation/review/rem-2-x.md" "$RTBR_STACK" 1
+review_gate_case "item-edit into Review with no project config yet allows through (best-effort)" \
+  allow "gh project item-edit --field-id $RTBR_FIELD_ID --single-select-option-id $RTBR_REVIEW_ID" "$RTBR_NO_STACK"
+review_gate_case "item-edit into Review with a detected stack and passing tests" \
+  allow "gh project item-edit --field-id $RTBR_FIELD_ID --single-select-option-id $RTBR_REVIEW_ID" "$RTBR_STACK" 0
+review_gate_case "item-edit into Review with a detected stack and failing tests is blocked" \
+  block "gh project item-edit --field-id $RTBR_FIELD_ID --single-select-option-id $RTBR_REVIEW_ID" "$RTBR_STACK" 1
+review_gate_case "item-edit into a different status option (Done) is ignored even with failing tests" \
+  allow "gh project item-edit --field-id $RTBR_FIELD_ID --single-select-option-id $RTBR_DONE_ID" "$RTBR_STACK" 1
 
 rm -rf "$RTBR_BIN" "$RTBR_NO_STACK" "$RTBR_STACK"
 

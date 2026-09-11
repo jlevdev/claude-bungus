@@ -3,7 +3,7 @@ name: pr-review
 description: This skill should be used when the user asks to review a pull request, review a PR, review this branch before merging, get a second opinion on a PR, or says "/pr-review". Runs a read-only, severity-tagged review using parallel specialized subagents and existing PR comments, then walks the user through each finding as a multi-choice decision; never edits code, approves, merges, or posts PR comments without an explicit per-finding choice to do so.
 argument-hint: <PR number or branch (optional — defaults to the current branch's PR)>
 allowed-tools: [Read, Grep, Glob, Agent, AskUserQuestion, "Bash(gh pr view:*)", "Bash(gh pr diff:*)", "Bash(gh pr comment:*)", "Bash(gh pr review --comment:*)", "Bash(gh api repos/*/pulls/*/reviews:*)", "Bash(gh api repos/*/pulls/*/comments:*)", "Bash(git log:*)", "Bash(git diff:*)"]
-version: 1.5.0
+version: 1.6.0
 ---
 
 # PR Review
@@ -35,7 +35,7 @@ Fetch the conversation before doing anything else, so the review accounts for wh
 Use what's genuinely useful from the comments: don't re-report something another reviewer already flagged and the author already addressed in a later commit; do note where this review's own findings agree with a prior human or bot reviewer (independent agreement is a real confidence signal, worth surfacing in Step 6); don't defer to another tool's verdict on anything — this skill forms its own opinion via Step 4's subagents regardless of what CodeRabbit or anyone else already said.
 
 ## Step 3 — Detect ticket references
-Parse the PR body's `Closes:`/`Tickets:` line (see the `git-pr` command's PR template) and each commit message's `[feat-N]`/`[rem-N]` tags for ticket IDs. This determines which subagents run in Step 4 — don't skip it even for a PR that looks purely technical; a reference might sit in a commit the PR title doesn't reflect.
+Parse the PR body's `Closes:` line (see the `git-pr` command's PR template) and each commit message's `[#N]` tags for ticket issue numbers — also check `gh pr view <number> --json closingIssuesReferences` for anything GitHub itself already resolved as a closing reference. This determines which subagents run in Step 4 — don't skip it even for a PR that looks purely technical; a reference might sit in a commit the PR title doesn't reflect.
 
 ## Step 4 — Launch specialized subagents in parallel
 Always:
@@ -74,8 +74,8 @@ Cap it: at most 8 🟡 Nits go into Step 6/7; beyond that, give a count and the 
 (+N more, mostly <theme> — ask to see the full list)
 
 ### Ticket cross-check (only if Step 3 found ticket IDs)
-- feat-N: acceptance criteria <met / gaps> — <ticket-reviewer summary>
-- feat-N: test coverage <ok / gaps> — <test-coverage-reviewer summary>
+- #N: acceptance criteria <met / gaps> — <ticket-reviewer summary>
+- #N: test coverage <ok / gaps> — <test-coverage-reviewer summary>
 
 ### From existing PR comments (only if Step 2 surfaced something relevant)
 - Already flagged by @<author> and addressed in <commit> — not re-reported

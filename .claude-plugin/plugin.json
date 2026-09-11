@@ -1,7 +1,7 @@
 {
   "name": "bg",
   "displayName": "claude-bungus",
-  "version": "1.1.0",
+  "version": "1.3.0",
   "description": "Ticket-based PRD workflow: TDD implementation, research, PR review/watch, and reviewer subagents for greenfield projects started from the claude-bungus template.",
   "author": {
     "name": "James LeVasseur"
