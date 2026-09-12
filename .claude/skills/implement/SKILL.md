@@ -3,7 +3,7 @@ name: implement
 description: This skill should be used when the user asks to implement, build, or work on one or more tickets — e.g. "implement #12", "build #7", "let's start on #4 and #5" — or says "/implement". Enters test-driven implementation mode against this project's GitHub Issues + Projects ticket workflow.
 argument-hint: <#N> [more issue numbers...]
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, EnterWorktree, ExitWorktree, mcp__github__issue_read, mcp__github__issue_write, mcp__github__list_issues, mcp__github__search_issues, mcp__github__add_issue_comment, mcp__github__projects_get, mcp__github__projects_list]
-version: 2.3.0
+version: 2.3.1
 ---
 
 # Implement Mode
@@ -54,9 +54,16 @@ substituting the actual values from `.claude/github-project-config.json` (writte
 4. Confirm tests pass.
 5. Refactor only within the scope of this ticket, keeping tests green.
 6. **Reviewer gate:** launch the `ticket-reviewer`, `silent-failure-hunter`, and `test-coverage-reviewer` subagents in parallel against this ticket's diff, giving each the issue number and its `issue_read` contents (they don't have their own MCP access to re-fetch it). Each has its own verdict vocabulary — `ticket-reviewer`/`test-coverage-reviewer` output `BLOCKED` or `PASS`; `silent-failure-hunter` blocks only on a `CRITICAL` finding. Treat any of those (`BLOCKED` or `CRITICAL`) as blocking. If any agent blocks, fix it and **re-run all three agents** against the updated diff, not just the one that flagged — a fix for one agent's finding can introduce something a different agent would have caught. Proceed to step 7 only once all three are non-blocking. Carry every non-blocking note forward into step 9 under "Reviewer Notes" so the human reviewer sees them without re-running the same checks.
-7. **Record the reviewed diff's fingerprint**, so a later `git-ship` call can tell whether anything has changed since this gate passed: compute it the same way `git-ship` does — `git diff HEAD` for tracked changes plus the full contents of every untracked file, concatenated and hashed:
+7. **Record the reviewed diff's fingerprint**, so a later `git-ship` call can tell whether anything has changed since this gate passed: compute it the same way `git-ship` does — diffed against the branch's merge-base with the default branch (not `HEAD`, which only shows uncommitted changes and would miss anything already committed), plus the full contents of every untracked file read safely (no filename ever passed through a shell string), concatenated and hashed:
    ```bash
-   { git diff HEAD; git status --porcelain --untracked-files=all | awk '$1=="??"{print $2}' | xargs -I{} sh -c 'echo "--- new file: {} ---"; cat "{}"'; } | sha256sum | cut -d" " -f1
+   merge_base=$(git merge-base HEAD <default-branch>)
+   {
+     git diff --binary "$merge_base";
+     git ls-files --others --exclude-standard -z | while IFS= read -r -d '' path; do
+       printf '%s\n' "--- new file: $path ---"
+       cat -- "$path"
+     done
+   } | sha256sum | cut -d" " -f1
    ```
    Post it via `add_issue_comment`, with a body of the form:
    ```
