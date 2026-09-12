@@ -89,11 +89,17 @@ Issue-body templates are in `templates/`. Field/option ids for the board (projec
 - **`DECISIONS.md`** gets a new ADR entry from `/bg:research` (Step 7, when a research conclusion sets or changes a real architectural/product decision) and from `/bg:implement` (end of a ticket, only if that ticket's work involved a decision not obvious from the code). Both draft the entry and confirm with the user via `AskUserQuestion` before appending — this file stays curated, not a firehose.
 - **`CHANGELOG.md`** gets an entry from `/bg:wrap-up`, which closes out any tickets a newly-merged branch shipped (setting Ticket Status to `Done`) and appends a summary line automatically, no confirmation needed — it's a mechanical record of a merge that already happened.
 
+### Stack Convention References
+
+`references/<stack>.md` (e.g. `references/dotnet-csharp.md`, `references/react-typescript.md`) holds idiomatic patterns and common anti-patterns for one language/framework this project uses — built once by `/bg:implement-and-tutor` (or `/bg:research`, scoped to idiom rather than a tech-selection comparison) using `/bg:research`'s own source-verified protocol, including its threat-model and minimum-3-independent-sources rules. Unlike a dated `research/YYYY-MM-DD-topic.md` log, which records a one-time decision, a stack reference is a living document meant to be updated in place as a stack's conventions get refined, not re-created per ticket.
+
+`/bg:implement-and-tutor` creates or reuses the relevant one for whatever a ticket touches; `/bg:check-in`'s `convention-reviewer` subagent reads it on every pre-commit pass to check a diff against it. If a diff touches a stack with no reference file yet, `convention-reviewer` still reviews it (falling back to its own general knowledge, at lower confidence) rather than refusing.
+
 ### Sprint Flow
 
 1. Tickets are opened as GitHub issues with Ticket Status `Todo`
-2. `/bg:implement #N` sets Ticket Status to `In Progress` and builds with TDD — offers (doesn't default to) isolating the work in a git worktree first, so a bad TDD cycle stays on a disposable branch
-3. Before setting Ticket Status to `Review`, the `ticket-reviewer`, `silent-failure-hunter`, and `test-coverage-reviewer` subagents check the diff against the ticket's acceptance criteria, error handling, and test coverage — blocking findings get fixed first, notes carry into the ticket summary
+2. Two ways to start work on a ticket, depending on who's actually writing the code: `/bg:implement #N` (agent-driven — the agent writes tests and code itself) or `/bg:implement-and-tutor #N` (human-driven — the agent only critiques your plan and prepares a `references/<stack>.md` conventions doc; you write the code). Both set Ticket Status to `In Progress`; `/bg:implement` additionally offers (doesn't default to) isolating the work in a git worktree first, so a bad TDD cycle stays on a disposable branch.
+3. The `ticket-reviewer`, `silent-failure-hunter`, and `test-coverage-reviewer` subagents check the diff against the ticket's acceptance criteria, error handling, and test coverage before Ticket Status becomes `Review` — blocking findings get fixed first, notes carry into the ticket summary. For a ticket built via `/bg:implement`, this happens inside its own TDD loop; for one built any other way (`/bg:implement-and-tutor`, or by hand), `/bg:git-ship` runs the same gate itself before shipping, so nothing reaches `Review` unreviewed regardless of how it was built. `/bg:check-in` is a separate, optional, non-gating step available any time before that — a lighter idiom/convention-only pass via `convention-reviewer`, useful while writing code yourself, not a substitute for the mandatory gate.
 4. Developer reviews; `/bg:review-tests` runs chaos monkey validation
 5. Once the PR is accepted and merged (via `Closes: #N` in the PR body, so GitHub auto-closes the issue), `/bg:wrap-up` sets Ticket Status to `Done` and logs it in `CHANGELOG.md`
 
@@ -109,17 +115,20 @@ Cost tiering: a skill that's read-only, single-shot, and never calls `AskUserQue
 | `/bg:migrate-tickets` | skill | One-time migration of an existing project's old `.md`-file tickets/questions onto GitHub Issues + Projects — for a project that started before this toolkit moved off files |
 | `/bg:start-project` | command | Turn a project blurb into a PRD, initial tickets, and an initialized git repo |
 | `/bg:research` | skill | Evaluate technology options with prompt-injection awareness and package vetting |
-| `/bg:implement #N` | skill | Enter TDD implementation mode for one or more tickets |
+| `/bg:implement #N` | skill | Enter TDD implementation mode for one or more tickets — agent-driven, agent writes the code |
+| `/bg:implement-and-tutor #N` | skill | Human-driven counterpart to `/bg:implement` — critiques your plan, builds/reuses a `references/<stack>.md` conventions doc, then you write the code yourself |
 | `/bg:describe #N` | skill | Summarize one or more tickets in plain language |
 | `/bg:whats-next` | skill | Overview of all in-progress and todo work |
 | `/bg:review-tests` | skill | Chaos monkey validation of tests for items in review |
 | `/bg:pr-review [PR\|branch]` | skill | Read-only, severity-tagged review of a finished PR via parallel subagents — see below |
 | `/bg:pr-watch [PR\|branch] [reset]` | skill | Walks every unresolved comment and merge-blocking condition one at a time via `AskUserQuestion`, with a recommendation for each, until the PR has nothing outstanding — see below |
-| `/bg:git-commit` | command | Stage and commit with conventional commit message |
+| `/bg:check-in [#N]` | skill | Pre-commit, idiom/convention-only feedback on the current diff via `convention-reviewer` — advisory, run as often as you like; never gates anything (that's `git-ship`'s job) |
+| `/bg:doc-code [file]` | command | Adds comments/docstrings to existing code only — never touches logic |
+| `/bg:git-commit` | command (agent-only) | Stage and commit with conventional commit message — `user-invocable: false`; followed internally by `implement` and `git-ship`, never typed directly, so it can't be confused with `git-ship` |
 | `/bg:git-branch` | command | Create a branch following naming conventions |
 | `/bg:git-pr` | command | Open a pull request or merge request |
 | `/bg:wrap-up` | command | Delete local branches/worktrees whose remote is gone; close out any tickets that branch shipped (Ticket Status → `Done`, logged to `CHANGELOG.md`) |
-| `/bg:git-ship` | command | Branch (if needed), commit, push, and open a PR in one step |
+| `/bg:git-ship` | command | Branch (if needed), commit, push, and open a PR in one step — if the ticket hasn't already passed the reviewer gate (see Sprint Flow step 3), runs it here and sets Ticket Status to `Review` before pushing |
 | `/bg:deploy` | command | Pre-deploy checklist and deployment execution |
 
 ### Reviewer Subagents
@@ -128,10 +137,11 @@ Invoked automatically (by `implement`'s reviewer gate and/or `pr-review` — see
 
 | Agent | Checks | Used by |
 |-------|--------|---------|
-| `ticket-reviewer` | Implementation against a ticket's acceptance criteria; scope creep; unmet dependencies | `implement` (always); `pr-review` (only if the PR references ticket issue numbers) |
-| `test-coverage-reviewer` | Behavioral test coverage against acceptance criteria (completeness — distinct from `review-tests`' mutation-based robustness check) | `implement` (always); `pr-review` (only if the PR references ticket issue numbers) |
-| `silent-failure-hunter` | Swallowed errors, overly broad catch blocks, unexplained fallbacks | `implement`; `pr-review` (always — no ticket required) |
+| `ticket-reviewer` | Implementation against a ticket's acceptance criteria; scope creep; unmet dependencies | `implement` (always); `git-ship` (only for a ticket that hasn't already passed this gate); `pr-review` (only if the PR references ticket issue numbers) |
+| `test-coverage-reviewer` | Behavioral test coverage against acceptance criteria (completeness — distinct from `review-tests`' mutation-based robustness check) | `implement` (always); `git-ship` (only for a ticket that hasn't already passed this gate); `pr-review` (only if the PR references ticket issue numbers) |
+| `silent-failure-hunter` | Swallowed errors, overly broad catch blocks, unexplained fallbacks | `implement`; `git-ship` (only for a ticket that hasn't already passed this gate); `pr-review` (always — no ticket required) |
 | `pr-correctness-reviewer` | General bugs and `CLAUDE.md` compliance, confidence-scored (≥50 reported) | `pr-review` (always — no ticket required) |
+| `convention-reviewer` | Idiomatic style and framework anti-patterns against `references/<stack>.md` — not correctness, scope, error handling, or test coverage | `check-in` (always, advisory only — doesn't gate anything) |
 
 `implement`'s reviewer gate and the `pr-review` skill are not the same thing: the gate runs mid-development, blocking, on one ticket's diff, before its Ticket Status becomes `Review`. `pr-review` runs read-only on a finished PR — anyone's — after the fact, and never blocks anything.
 

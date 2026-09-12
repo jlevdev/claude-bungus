@@ -3,7 +3,7 @@ name: implement
 description: This skill should be used when the user asks to implement, build, or work on one or more tickets — e.g. "implement #12", "build #7", "let's start on #4 and #5" — or says "/implement". Enters test-driven implementation mode against this project's GitHub Issues + Projects ticket workflow.
 argument-hint: <#N> [more issue numbers...]
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, EnterWorktree, ExitWorktree, mcp__github__issue_read, mcp__github__issue_write, mcp__github__list_issues, mcp__github__search_issues, mcp__github__add_issue_comment, mcp__github__projects_get, mcp__github__projects_list]
-version: 2.2.0
+version: 2.3.2
 ---
 
 # Implement Mode
@@ -16,7 +16,7 @@ Build one or more tickets using test-driven development. Tickets are GitHub Issu
 ```bash
 gh project item-edit --id <item-id> --project-id <project id> --field-id <ticket status field id> --single-select-option-id <status option id>
 ```
-substituting the actual values from `.claude/github-project-config.json` (written by `/bg:init`) for every placeholder above — not the placeholder text, and not a reference to where it came from. `<item-id>` is the project item id for this ticket's issue — resolve it with `gh project item-list <number> --owner <owner> --format json`, matching on the issue's URL, if it isn't already known from an earlier step this run.
+substituting the actual values from `.claude/github-project-config.json` (written by `/bg:init`) for every placeholder above — not the placeholder text, and not a reference to where it came from. `<item-id>` is the project item id for this ticket's issue — resolve it by reading `.claude/github-project-config.json` for `project.number`/`project.owner`, then `gh project item-list <project.number> --owner <project.owner> --limit 200 --format json` (the default limit is 30 — set it high enough to actually cover the whole board) and matching the single item whose content URL equals this issue's URL; if none match or more than one does, stop and report rather than guessing which item this ticket is. Skip this if the item-id is already known from an earlier step this run.
 
 ## Pre-flight
 
@@ -54,7 +54,29 @@ substituting the actual values from `.claude/github-project-config.json` (writte
 4. Confirm tests pass.
 5. Refactor only within the scope of this ticket, keeping tests green.
 6. **Reviewer gate:** launch the `ticket-reviewer`, `silent-failure-hunter`, and `test-coverage-reviewer` subagents in parallel against this ticket's diff, giving each the issue number and its `issue_read` contents (they don't have their own MCP access to re-fetch it). Each has its own verdict vocabulary — `ticket-reviewer`/`test-coverage-reviewer` output `BLOCKED` or `PASS`; `silent-failure-hunter` blocks only on a `CRITICAL` finding. Treat any of those (`BLOCKED` or `CRITICAL`) as blocking. If any agent blocks, fix it and **re-run all three agents** against the updated diff, not just the one that flagged — a fix for one agent's finding can introduce something a different agent would have caught. Proceed to step 7 only once all three are non-blocking. Carry every non-blocking note forward into step 9 under "Reviewer Notes" so the human reviewer sees them without re-running the same checks.
-7. Set the ticket's Ticket Status to `Review` via `gh project item-edit` (see above) — this is what `require-tests-before-review.sh` gates on, so make sure the full test suite genuinely passes first; the hook re-verifies but shouldn't be the first line of defense.
+7. **Record the reviewed diff's fingerprint**, so a later `git-ship` call can tell whether anything has changed since this gate passed: compute it the same way `git-ship` does — diffed against the branch's merge-base with the default branch (not `HEAD`, which only shows uncommitted changes and would miss anything already committed), plus the full contents of every untracked file read safely (no filename ever passed through a shell string), concatenated and hashed:
+   ```bash
+   set -euo pipefail
+   merge_base=$(git merge-base HEAD <default-branch>)
+   {
+     git diff --binary "$merge_base";
+     git ls-files --others --exclude-standard -z | while IFS= read -r -d '' path; do
+       if [ -f "$path" ] && [ ! -L "$path" ]; then
+         printf '%s\n' "--- new file: $path ---"
+         cat -- "$path"
+       else
+         printf '%s\n' "--- skipped non-regular-file path: $path ---"
+       fi
+     done
+   } | sha256sum | cut -d" " -f1
+   ```
+   `set -euo pipefail` matters here, not just as habit: without it, a failed `git merge-base` would silently pass an empty revision to `git diff`, and the pipeline would still produce *some* hash rather than erroring — a fingerprint computed this way could coincidentally match an equally-broken prior marker on a later `git-ship` call and wrongly skip the gate. Skipping symlinks/special files (instead of `cat`-ing them) avoids the same fate from a different cause: `cat` on a symlink to `/dev/zero` or an unread FIFO never returns, hanging this step indefinitely on a single stray untracked file.
+   Post it via `add_issue_comment`, with a body of the form:
+   ```
+   Reviewer gate passed for <fingerprint>.
+   <!-- reviewed-diff-sha256: <fingerprint> -->
+   ```
+   Then set the ticket's Ticket Status to `Review` via `gh project item-edit` (see above) — this is what `require-tests-before-review.sh` gates on, so make sure the full test suite genuinely passes first; the hook re-verifies but shouldn't be the first line of defense.
 8. **If, and only if,** this ticket involved a genuine architectural or approach decision that isn't obvious from reading the resulting code and isn't already covered by an existing `DECISIONS.md` entry (e.g. "chose polling over a websocket for v1," "denormalized X for read performance") — not something ambiguous enough to have warranted a blocking question, but still worth a future reader knowing *why* the code is shaped this way: draft an ADR entry using the template in `DECISIONS.md` (skip entirely if `DECISIONS.md` doesn't exist yet at the project root — don't create it here, that's `start-project`'s job) and ask via `AskUserQuestion` (`Add to DECISIONS.md` / `Skip` / `Edit first`) before appending. Most tickets won't produce one of these — don't manufacture a decision to fill this step.
 9. Summarize: what files changed, what tests were added, any decisions made (including whether one was recorded to `DECISIONS.md`), and the Reviewer Notes from step 6.
 
