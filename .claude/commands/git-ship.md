@@ -21,15 +21,21 @@ Use this instead of running `/git-branch`, `/git-commit` (agent-only — see bel
    - **Resolve the ticket's project item.** Read `.claude/github-project-config.json` for `project.number` and `project.owner`, then `gh project item-list <project.number> --owner <project.owner> --limit 200 --format json` (the default limit is 30 — set it high enough to actually cover the whole board) and match the single item whose content URL equals this issue's URL. If none match or more than one does, stop and report rather than guessing which item this ticket is. Check that item's current Ticket Status.
    - **Compute the current diff's fingerprint** (needed either way — to compare against, or to record): regenerate it live, don't reuse the Context section's snapshot, and diff against the branch's merge-base with the repository's default branch — not `HEAD`. `git diff HEAD` only shows uncommitted changes, but this project's own conventions (see "When to use" above) allow plain `git commit`s during development, so by the time `git-ship` runs, some or all of a ticket's real changes may already be committed — a `HEAD`-based diff would miss them entirely, and the reviewer gate would trivially pass on whatever little or nothing is left uncommitted. Diffing against the merge-base instead captures every change this branch has made since it diverged, committed or not, and — as a side effect — keeps the fingerprint stable across step 4's own commit (the merge-base point doesn't move; `HEAD` does). Untracked files still need adding separately (`git diff` never includes those), read safely — filenames aren't shell-escaped, so this must never pass one through a shell string:
      ```bash
+     set -euo pipefail
      merge_base=$(git merge-base HEAD <default-branch>)
      {
        git diff --binary "$merge_base";
        git ls-files --others --exclude-standard -z | while IFS= read -r -d '' path; do
-         printf '%s\n' "--- new file: $path ---"
-         cat -- "$path"
+         if [ -f "$path" ] && [ ! -L "$path" ]; then
+           printf '%s\n' "--- new file: $path ---"
+           cat -- "$path"
+         else
+           printf '%s\n' "--- skipped non-regular-file path: $path ---"
+         fi
        done
      } | sha256sum | cut -d" " -f1
      ```
+     `set -euo pipefail` matters here, not just as habit: without it, a failed `git merge-base` (detached HEAD, missing default-branch ref, etc.) would silently pass an empty revision to `git diff`, and the pipeline would still produce *some* hash rather than erroring — a fingerprint computed this way could coincidentally match an equally-broken prior marker and wrongly skip the gate. Skipping symlinks/special files (instead of `cat`-ing them) avoids the same fate from a different cause: `cat` on a symlink to `/dev/zero` or an unread FIFO never returns, hanging this step indefinitely on a single stray untracked file.
    - **If Ticket Status is already `Review` or `Done`:** look up the ticket's most recent fingerprint marker — `gh issue view <N> --json comments --jq` for the latest comment matching `<!-- reviewed-diff-sha256: ... -->`. If it matches the fingerprint just computed, this exact diff already passed the gate — skip to step 4. If it doesn't match (or no marker exists — a ticket reviewed before this mechanism existed), something changed since the last review despite the status still saying `Review`/`Done`; fall through and run the gate below, same as if status were still `In Progress`.
    - **Otherwise (gate not yet passed, or the diff changed since it last did):** fetch the issue body via `issue_read`, then launch the `ticket-reviewer`, `silent-failure-hunter`, and `test-coverage-reviewer` subagents in parallel against the diff just computed above, giving each the issue number and its `issue_read` contents. Same verdict handling as `implement`'s reviewer gate: `ticket-reviewer`/`test-coverage-reviewer` output `BLOCKED` or `PASS`; `silent-failure-hunter` blocks only on `CRITICAL`. If any agent blocks, fix it, **recompute the fingerprint fresh** (the files just changed), and **re-run all three** against the new diff, not just the one that flagged. Once all three are non-blocking, carry their non-blocking notes forward to report to the user alongside the PR URL in step 7.
    - Once clean, record the fingerprint so a future `git-ship` call can trust this result:
