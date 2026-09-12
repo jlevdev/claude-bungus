@@ -1,7 +1,10 @@
 ---
 allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git add:*), Bash(git commit:*), Bash(git log:*), Bash(git branch:*)
 description: Stage and commit changes using a conventional commit message
+user-invocable: false
 ---
+
+> Agent-only: hidden from the `/` menu on purpose — `/git-ship` and `implement` follow these conventions internally when they commit. This avoids confusing it with `/git-ship`, which is the actual "ticket is done, ship it" command; typing a commit message by hand for a WIP change is still just `git commit`.
 
 ## Context
 - Current git status: !`git status`
