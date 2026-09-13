@@ -163,7 +163,7 @@ OPEN_THREADS=$(jq -c --slurpfile decided <(printf '%s' "$DECIDED_THREADS") '
 
 NEW_COMMENTS=$(jq -c --slurpfile decided <(printf '%s' "$DECIDED_COMMENTS") '
   [.comments[] | select(.id as $id | $decided[0] | index($id) == null)
-               | select(.body | test("auto-generated comment: (summarize|review in progress) by coderabbit\\.ai") | not)
+               | select(.author.login == "coderabbitai" and (.body | test("auto-generated comment: (summarize|review in progress) by coderabbit\\.ai")) | not)
                | {id, author: .author.login, body}]
 ' <<< "$CORE")
 
