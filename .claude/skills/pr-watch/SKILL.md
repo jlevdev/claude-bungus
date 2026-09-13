@@ -3,7 +3,7 @@ name: pr-watch
 description: This skill should be used when the user asks to get a PR ready to merge, work through PR feedback, address review comments, resolve what's blocking a PR from merging, or says "/pr-watch". Walks every unresolved comment (from AI and human reviewers) and every merge-blocking condition one at a time via AskUserQuestion, with a recommendation for each, until the PR has nothing outstanding.
 argument-hint: <PR number or branch (optional — defaults to the current branch's PR)> [reset]
 allowed-tools: [Read, Write, AskUserQuestion, Edit, Monitor, "Bash(.claude/skills/pr-watch/scripts/find-open-issues.sh:*)", "Bash(.claude/skills/pr-watch/scripts/watch-loop.sh:*)", "Bash(gh pr view:*)", "Bash(gh pr checks:*)", "Bash(gh api graphql:*)", "Bash(gh pr comment:*)", "Bash(gh pr review:*)", "Bash(gh repo view:*)", "Bash(git branch:*)", "Bash(git rev-parse:*)", "Bash(git add:*)", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git commit:*)", "Bash(git push:*)"]
-version: 4.1.0
+version: 4.2.0
 ---
 
 # PR Watch
@@ -36,6 +36,8 @@ This is **fetch mode** (the default) and is read-only — it does not write to t
 Marking a *thread or comment* as decided is a separate, explicit step (`... mark thread <id>` / `... mark comment <id>`) that Step 5/6 calls only *after* actually acting on that specific item — never as a side effect of fetching. Calling fetch mode more than once in a row is always safe and returns the same items; it will never make something vanish.
 
 If `open_thread_count`, `new_comment_count`, and `blocking_count` are all 0: say so plainly — "Nothing outstanding on PR #N" — and stop. That's success, not a non-event to apologize for.
+
+**CodeRabbit's own top-level PR comment never shows up here at all**, in either of its two forms (the "still processing, please wait" placeholder, or the walkthrough/summary it gets rewritten into once ready) — `find-open-issues.sh` filters it out before it's ever counted as a new comment, since neither form carries a finding to act on. Its actual findings still surface normally, as review threads. If a watch cycle seems to have "missed" a plain-language CodeRabbit summary comment, that's this filter working as intended, not a bug — don't re-fetch expecting to find it.
 
 ## Step 4 — Form a recommendation for each item, don't just relay it
 For every open thread, new comment, and blocking condition, decide what you actually think before asking:

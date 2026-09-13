@@ -1,7 +1,10 @@
 ---
 allowed-tools: Bash(git log:*), Bash(git branch:*), Bash(git status:*), Bash(gh pr create:*), Bash(gh pr view:*), Bash(gh pr list:*), Bash(glab mr create:*), Bash(glab mr view:*)
 description: Open a pull request on GitHub (or GitLab) for the current branch using the CLI
+user-invocable: false
 ---
+
+> Agent-only: hidden from the `/` menu on purpose — `/git-ship` follows these conventions internally as its final step. There's no case for opening a PR directly that `/git-ship` doesn't already cover (it's a correct no-op through the branch/commit/gate steps if there's nothing left to do there, same as the case where commits are already pushed) — and having it directly callable was one more thing to second-guess against `/git-ship` mid-workflow.
 
 ## Context
 - Current branch: !`git branch --show-current`
