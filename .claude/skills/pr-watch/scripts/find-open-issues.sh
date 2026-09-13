@@ -33,6 +33,20 @@
 # Known limitation, not silently hidden: a review thread is tracked by
 # its stable thread ID, so a *new reply* landing in an already-decided
 # thread does not resurface it. Best-effort, not a guarantee.
+#
+# CodeRabbit's own top-level PR comment (not a review thread) is excluded
+# from new_comments entirely, not just filtered by decided-state. It's one
+# comment CodeRabbit edits in place over the PR's lifetime -- first posted
+# as a "still processing, please wait" placeholder, later rewritten into a
+# walkthrough/summary -- and in both forms it carries no finding to act on;
+# every actual finding CodeRabbit raises arrives as its own review thread
+# instead, which this script already surfaces normally via $OPEN_THREADS.
+# Asking the user to dismiss a "please wait" notice, then asking again once
+# it's silently replaced by a summary with the same non-decision, is pure
+# noise -- confirmed live on this repo's PR #13, 2026-09-12. Matched by
+# CodeRabbit's own marker HTML comment rather than by author alone, so a
+# hypothetical future CodeRabbit top-level comment that doesn't carry this
+# specific marker still surfaces normally instead of being silently eaten.
 
 set -euo pipefail
 
@@ -149,6 +163,7 @@ OPEN_THREADS=$(jq -c --slurpfile decided <(printf '%s' "$DECIDED_THREADS") '
 
 NEW_COMMENTS=$(jq -c --slurpfile decided <(printf '%s' "$DECIDED_COMMENTS") '
   [.comments[] | select(.id as $id | $decided[0] | index($id) == null)
+               | select(.author.login == "coderabbitai" and (.body | test("auto-generated comment: (summarize|review in progress) by coderabbit\\.ai")) | not)
                | {id, author: .author.login, body}]
 ' <<< "$CORE")
 

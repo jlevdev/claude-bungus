@@ -124,7 +124,7 @@ Cost tiering: a skill that's read-only, single-shot, and never calls `AskUserQue
 | `/doc-code [file]` | command | Adds comments/docstrings to existing code only — never touches logic |
 | `/git-commit` | command (agent-only) | Stage and commit with conventional commit message — `user-invocable: false`; followed internally by `implement` and `git-ship`, never typed directly, so it can't be confused with `git-ship` |
 | `/git-branch` | command | Create a branch following naming conventions |
-| `/git-pr` | command | Open a pull request or merge request |
+| `/git-pr` | command (agent-only) | Open a pull request or merge request — `user-invocable: false`; followed internally by `git-ship` as its final step, never typed directly |
 | `/wrap-up` | command | Delete local branches/worktrees whose remote is gone; close out any tickets that branch shipped (Ticket Status → `Done`, logged to `CHANGELOG.md`) |
 | `/git-ship` | command | Branch (if needed), commit, push, and open a PR in one step — if the ticket hasn't already passed the reviewer gate (see Sprint Flow step 3), runs it here and sets Ticket Status to `Review` before pushing |
 | `/deploy` | command | Pre-deploy checklist and deployment execution |
