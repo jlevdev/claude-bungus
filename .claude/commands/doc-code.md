@@ -10,7 +10,7 @@ Add documentation to code that already works — comments and docstrings only. T
 
 ## Context
 - Git status: !`git status`
-- Staged and unstaged changes: !`git diff HEAD`
+- Staged and unstaged changes: !`git diff HEAD 2>&1 || true`
 
 ## Steps
 

@@ -6,7 +6,7 @@ description: Commit, push, and open a PR in one step — gates on the reviewer s
 ## Context
 - Current branch: !`git branch --show-current`
 - Git status: !`git status`
-- Staged and unstaged changes: !`git diff HEAD`
+- Staged and unstaged changes: !`git diff HEAD 2>&1 || true`
 
 ## When to use
 Use this instead of running `/git-branch`, `/git-commit` (agent-only — see below), and `/git-pr` separately when a ticket is fully implemented, tested, and ready to ship in one motion. For incremental commits during development, no command is needed — a plain `git commit` covers that; don't open a PR before the ticket is actually done.

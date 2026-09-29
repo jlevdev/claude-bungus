@@ -8,8 +8,8 @@ user-invocable: false
 
 ## Context
 - Current branch: !`git branch --show-current`
-- Recent commits on this branch: !`git log --oneline -15`
-- Existing PR for this branch, if any (GitHub only — see Steps for GitLab): !`gh pr view --json url,state`
+- Recent commits on this branch: !`git log --oneline -15 2>&1 || true`
+- Existing PR for this branch, if any (GitHub only — see Steps for GitLab): !`gh pr view --json url,state 2>&1 || true`
 
 ## Default platform: GitHub
 This project uses GitHub. Use `gh` for all PR operations. If a specific project overrides this in its `CLAUDE.md` Tech Stack table to GitLab, use `glab mr create` instead.

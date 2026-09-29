@@ -8,9 +8,9 @@ user-invocable: false
 
 ## Context
 - Current git status: !`git status`
-- Staged and unstaged changes: !`git diff HEAD`
+- Staged and unstaged changes: !`git diff HEAD 2>&1 || true`
 - Current branch: !`git branch --show-current`
-- Recent commits (match this repo's style and ticket-ref conventions): !`git log --oneline -10`
+- Recent commits (match this repo's style and ticket-ref conventions): !`git log --oneline -10 2>&1 || true`
 
 ## Conventional commit format
 `<type>(<scope>): <short description>`
